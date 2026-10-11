@@ -1,0 +1,5 @@
+base: default.yaml
+run:
+  name: oracle_central
+protocol:
+  selector: oracle_central

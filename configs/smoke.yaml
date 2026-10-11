@@ -1,0 +1,16 @@
+# A few rounds with real SGD on a small model and few nodes (CIFAR-10 must be in $HOME/dfl-data).
+base: default.yaml
+run:
+  name: smoke
+  rounds: 4
+  accuracy_interval: 2
+network:
+  N: 16
+protocol:
+  n: 4
+  M: 10
+  k_nb: 7
+train:
+  max_batches_per_epoch: 3
+data:
+  alpha: 0.5

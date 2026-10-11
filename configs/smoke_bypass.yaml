@@ -1,0 +1,7 @@
+# Fast protocol check without SGD.
+base: smoke.yaml
+run:
+  name: smoke_bypass
+  rounds: 6
+data:
+  bypass_training: true

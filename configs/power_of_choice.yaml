@@ -1,0 +1,5 @@
+base: default.yaml
+run:
+  name: power_of_choice
+protocol:
+  selector: power_of_choice

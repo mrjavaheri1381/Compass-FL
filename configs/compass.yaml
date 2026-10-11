@@ -1,0 +1,4 @@
+# The paper's protocol with the paper's default solver.
+base: default.yaml
+run:
+  name: compass

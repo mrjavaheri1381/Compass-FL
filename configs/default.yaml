@@ -1,0 +1,96 @@
+# Documented default configuration. Every paper parameter is listed; see README "Configuration" for the mapping.
+seed: 42
+run:
+  name: default
+  out_dir: runs
+  rounds: 200                  # T
+  accuracy_interval: 5
+  log_level: WARNING
+data:
+  dataset: cifar10             # cifar10 | cifar100 | femnist | shakespeare
+  partition: dirichlet         # dirichlet | iid | natural
+  alpha: 0.3                   # Dirichlet(alpha) label skew
+  min_samples: 20
+model:
+  architecture: null           # null = dataset default (gnlenet for CIFAR); resnet8
+train:
+  epochs: 1                    # E
+  batch_size: 20
+  lr: 0.002
+  momentum: 0.9
+  cycles_per_sample: 1.0       # c (f is then in samples/s)
+network:
+  N: 100                       # N
+  initially_active: 0          # 0 = all
+env:
+  devices:
+    source: fedscale           # FedScale profiles shipped with Plexus (data/fedscale_traces)
+    num_classes: 3             # device classes kappa (quantile tiers)
+    cut_points: [0.3333333333, 0.6666666667]
+    down_up_ratio: 4.0         # assumption: download = 4 x upload
+    sigma_rel: 0.2             # sigma_bar_k = 0.2 x class mean of mu
+    fluct_cv: [0.3, 0.2, 0.1]  # per-round log-normal fluctuation of f and B, per class
+    slowdown_prob: 0.02
+    slowdown_factor: [3.0, 5.0]
+    dropout: [0.05, 0.02, 0.01]
+  latency:
+    model: wondernetwork       # WonderNetwork city RTTs shipped with Plexus (data/latencies.txt)
+    city_assignment: round_robin   # round_robin | concentrated
+    access_delay_ms: [30.0, 15.0, 5.0]
+    jitter_cv: 0.1
+    plexus_compat: false
+  failures:
+    crash_prob: [0.0, 0.0, 0.0]
+    scripted: []               # e.g. [{round: 10, target: aggregator, when: dispatch, downtime: 0}]
+    joins: []                  # e.g. [[300, 5]] -> 5 reserve nodes join at t = 300 s
+protocol:
+  selector: compass            # compass | compass_random | plexus | power_of_choice | oort_like | oracle_central
+  n: 10                        # n
+  M: 30                        # M
+  k_nb: 20                     # k_nb
+  pool_seed: round             # round | model_hash
+  L_max: 0.0                   # 0 = L_max_percentile of the realized RTTs
+  L_max_percentile: 75.0
+  f_min: -1                    # < 0 = f_min_percentile of the true capacities
+  f_min_percentile: 20.0
+  B_min: -1
+  B_min_percentile: 20.0
+  aggregator_trains: false
+  verify_tol: 1.0e-9
+  sim_tol: 1.0e-3              # CKKS tolerance on |S_ij - S_ji|
+  probing:
+    P: 3                       # P
+    prefetch: false
+utility:
+  form: multiplicative         # multiplicative | additive
+  weights: {comp: 0.2, comm: 0.2, data: 0.2, fair: 0.2, strag: 0.2}   # w (strictly positive, sum 1)
+  w_c: 0.5                     # cohesion exponent (0 removes cohesion)
+  w_r: 0.5                     # representativeness exponent
+  f_ref: 0.0                   # 0 = 75th percentile of the true capacities
+  dtau_cap: 20.0               # Delta tau_cap
+  eps: 1.0e-3                  # epsilon
+state:
+  alpha: 0.3                   # Q smoothing alpha
+  gamma: 0.1                   # Q lateness penalty gamma (1/s)
+  beta: 0.2                    # step-size floor beta
+  Q0: 1.0
+closing:
+  policy: predictive           # predictive | wait_all | fixed_deadline | over_selection
+  z: 2.0                       # z
+  delta_dl: 600.0              # delta_dl (absolute cap)
+  grace: 60.0                  # g
+  over_selection: 0.3          # o
+  contention_aware: true
+  rho: 0.9                     # censoring threshold
+  wait_grace_before_selection: false
+solver:
+  name: greedy_swap            # greedy_swap | exact | tabu | simulated_annealing | genetic | lns | random
+  R_s: 3                       # R_s
+  I_max: 50                    # I_max
+he:
+  mode: plaintext              # plaintext | ckks
+  dp: {enabled: false, sigma: 0.01}
+fault:
+  max_resamples: 2
+  max_missed: 3
+  client_backups: false

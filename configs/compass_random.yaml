@@ -1,0 +1,5 @@
+base: default.yaml
+run:
+  name: compass_random
+protocol:
+  selector: compass_random
