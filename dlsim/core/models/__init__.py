@@ -18,9 +18,13 @@ def unserialize_model(serialized_model: bytes, dataset: str, architecture: Optio
 
 def create_model(dataset: str, architecture: Optional[str] = None) -> Model:
     if dataset == "cifar10":
-        if not architecture:
+        if not architecture or architecture == "gnlenet":
             from dlsim.core.models.cifar10 import GNLeNet
             return GNLeNet(input_channel=3, output=10, model_input=(32, 32))
+        if architecture == "resnet8":
+            from dlsim.compass.data import ResNet8
+            return ResNet8(10)
+        raise RuntimeError("Unknown architecture %s for dataset %s" % (architecture, dataset))
     elif dataset == "celeba":
         from dlsim.core.models.celeba import CNN
         return CNN()
