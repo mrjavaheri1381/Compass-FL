@@ -149,7 +149,12 @@ def test_plexus_port_matches_original_participants(tmp_path):
     work.mkdir()
     for name in ("data",):
         os.symlink(os.path.join(ROOT, name), str(work / name))
-    result = subprocess.run([sys.executable, os.path.join(ROOT, "simulations", "plexus", "cifar10.py"), "--peers", "16",
+    # The original Plexus code calls asyncio.get_event_loop() before creating its loop, which Python >= 3.12 no longer
+    # allows without a current loop; set one first (the original code itself is left untouched).
+    script = os.path.join(ROOT, "simulations", "plexus", "cifar10.py")
+    launcher = ("import asyncio, runpy, sys; asyncio.set_event_loop(asyncio.new_event_loop()); "
+                "sys.argv = sys.argv[1:]; runpy.run_path(sys.argv[0], run_name='__main__')")
+    result = subprocess.run([sys.executable, "-c", launcher, script, "--peers", "16",
                              "--sample-size", "4", "--bypass-training", "--bypass-model-transfers", "--rounds", "5",
                              "--duration", "0", "--seed", "42", "--log-level", "ERROR",
                              "--accuracy-logging-interval", "0"], cwd=str(work), env=env, capture_output=True,
