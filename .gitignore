@@ -12,3 +12,8 @@ simulations/gl/data/**
 scripts/data/**
 *.log
 *.txt
+
+# COMPASS-FL run outputs
+runs/
+plots/
+.pytest_cache/

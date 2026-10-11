@@ -1,7 +1,12 @@
 torch
 torchvision
 libnacl
-cryptography
+cryptography<43  # pyipv8 uses the SECT curves removed in later versions
 dataclasses_json
 yappi
 netifaces
+numpy
+tenseal
+pyyaml
+matplotlib  # scripts/plot_compass.py
+pytest  # tests/
