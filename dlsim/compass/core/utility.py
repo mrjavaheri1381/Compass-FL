@@ -225,6 +225,22 @@ class IncrementalState:
         self.members.append(v)
         self._extremes()
 
+    def remove(self, v: int) -> None:
+        """
+        Inverse of ``add`` (used when a depth-first search backtracks).
+        """
+        if not self.in_set[v]:
+            raise ValueError("%d not in the set" % v)
+        p = self.problem
+        self.sigma -= p.S[:, v]
+        self.P -= self.sigma[v]  # sigma_v now excludes v itself: sum_{j in C \ {v}} S_vj
+        self.R -= p.r[v]
+        self.fair_sum -= p.fair[v]
+        self.q_sum -= p.Q[v]
+        self.in_set[v] = False
+        self.members.remove(v)
+        self._extremes()
+
     def swap(self, u: int, v: int) -> None:
         p = self.problem
         self.P = self.P - (self.sigma[u] - p.S[u, u]) + self.sigma[v] - p.S[u, v]
