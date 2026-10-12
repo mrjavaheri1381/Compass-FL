@@ -39,7 +39,7 @@ from dlsim.compass.solvers.exact import ExactSolver  # noqa: E402
 import selection_optimality as so  # noqa: E402
 
 
-def solve_scip(problem, time_limit: float, verbose: bool = False):
+def solve_scip(problem, time_limit: float, verbose: bool = False, threads: int = 1):
     from pyscipopt import Model, log, quicksum
 
     p = problem.params
@@ -49,7 +49,8 @@ def solve_scip(problem, time_limit: float, verbose: bool = False):
     if not verbose:
         m.hideOutput()
     m.setParam("limits/time", time_limit)
-    m.setParam("parallel/maxnthreads", 1)
+    m.setParam("parallel/maxnthreads", threads)
+    m.setParam("parallel/minnthreads", threads)
     x = [m.addVar(vtype="B", name="x%d" % i) for i in range(k)]
     m.addCons(quicksum(x) == n)
     y = {}
@@ -85,7 +86,10 @@ def solve_scip(problem, time_limit: float, verbose: bool = False):
     m.addCons(t <= objective)
     m.setObjective(t, "maximize")
     start = time.perf_counter()
-    m.optimize()
+    if threads > 1:
+        m.solveConcurrent()  # Concurrent racing of differently configured SCIP solvers, one per thread
+    else:
+        m.optimize()
     elapsed = time.perf_counter() - start
     status = m.getStatus()
     members = None
@@ -103,6 +107,8 @@ def main():
     parser.add_argument("--warm-start", default="greedy_swap", help="warm start of our B&B (none to disable)")
     parser.add_argument("--out", default=os.path.join(ROOT, "experiments", "results", "exact_vs_scip"))
     parser.add_argument("--verbose", action="store_true")
+    parser.add_argument("--threads", type=int, nargs="+", default=None,
+                        help="only compare SCIP with these thread counts (no B&B), e.g. --threads 1 8")
     known, rest = parser.parse_known_args()
     so_args = _so_args(known.rounds, rest)  # population/instance options of selection_optimality.py
     os.makedirs(known.out, exist_ok=True)
@@ -110,6 +116,9 @@ def main():
     pop = so.build_population(so_args)
     params = so.make_params(so_args, pop)
     instances = so.generate_instances(so_args, pop, params)
+    if known.threads:
+        _compare_threads(instances, so_args, params, known)
+        return
     rows = []
     for inst in instances:
         problem = so.to_problem(inst, so_args.n, params)
@@ -141,6 +150,29 @@ def main():
         sum(r["same_set"] for r in rows), len(rows), sum(b < s for b, s in zip(bb_t, sc_t)), len(rows),
         float(np.median(sc_t / bb_t))))
     _plot(rows, known.out)
+
+
+def _compare_threads(instances, so_args, params, known):
+    rows = []
+    for inst in instances:
+        problem = so.to_problem(inst, so_args.n, params)
+        entry = {"round": inst["round"]}
+        for threads in known.threads:
+            members, elapsed, status, bound, nodes = solve_scip(problem, known.time_limit, known.verbose, threads)
+            entry[threads] = {"time": elapsed, "status": status, "nodes": nodes,
+                              "utility": evaluate(problem, members).utility if members is not None else None,
+                              "members": members}
+            print("round %3d | SCIP threads=%d: %7.1fs %-9s U=%.6f nodes=%d" % (
+                inst["round"], threads, elapsed, status, entry[threads]["utility"], nodes), flush=True)
+        rows.append(entry)
+    with open(os.path.join(known.out, "threads.json"), "w") as handle:
+        json.dump(rows, handle, indent=1, default=str)
+    base = known.threads[0]
+    for threads in known.threads[1:]:
+        speedups = [r[base]["time"] / r[threads]["time"] for r in rows]
+        same = sum(r[base]["members"] == r[threads]["members"] for r in rows)
+        print("threads=%d vs %d: speed-up %s, same set %d/%d" % (
+            threads, base, ", ".join("x%.2f" % v for v in speedups), same, len(rows)))
 
 
 def _so_args(rounds, rest):
