@@ -1,0 +1,105 @@
+{
+  "args": {
+    "N": 1000,
+    "M": 50,
+    "n": 10,
+    "rounds": 200,
+    "seed": 42,
+    "workers": 4,
+    "solvers": [
+      "greedy_swap",
+      "tabu",
+      "simulated_annealing",
+      "genetic",
+      "lns",
+      "random",
+      "exact"
+    ],
+    "driver": "greedy_swap",
+    "exact_time": 600.0,
+    "form": "multiplicative",
+    "weights": [
+      0.2,
+      0.2,
+      0.2,
+      0.2,
+      0.2
+    ],
+    "w_c": 0.5,
+    "w_r": 0.5,
+    "dtau_cap": 20.0,
+    "eps": 0.001,
+    "L_max": 0.0,
+    "alpha": 0.3,
+    "classes": 10,
+    "samples": 50000,
+    "min_samples": 10,
+    "alpha_q": 0.3,
+    "gamma": 0.1,
+    "dropout": 0.03,
+    "late_prob": [
+      0.3,
+      0.15,
+      0.05
+    ],
+    "mean_lateness": 15.0,
+    "checkpoint_every": 10,
+    "resume": false,
+    "out": "/Users/mrjavaheri/Desktop/Master/Thesis/Code/Compass-FL/experiments/results/selection_optimality"
+  },
+  "utility": {
+    "form": "multiplicative",
+    "weights": {
+      "comp": 0.2,
+      "comm": 0.2,
+      "data": 0.2,
+      "fair": 0.2,
+      "strag": 0.2
+    },
+    "w_c": 0.5,
+    "w_r": 0.5,
+    "f_ref": 41.666666666666664,
+    "L_max": 0.5550063625,
+    "dtau_cap": 20.0,
+    "eps": 0.001
+  },
+  "wall_time_s": 3435.5523488521576,
+  "devices": {
+    "fedscale_profiles_total": 500000,
+    "fedscale_profiles_after_filter": 500000,
+    "fedscale_profiles_sampled": 1000,
+    "fedscale_filters": {
+      "min_ms_per_sample": 0.0,
+      "max_ms_per_sample": 0.0,
+      "min_kbps": 0.0,
+      "max_kbps": 0.0,
+      "dropped_nonpositive": 0
+    },
+    "class_cut_scores": [
+      -0.30994344790444417,
+      0.3236074876495172
+    ],
+    "class_sizes": [
+      334,
+      333,
+      333
+    ]
+  },
+  "latency": {
+    "cities": 227,
+    "entries_negative": 51,
+    "entries_zero_offdiag": 0,
+    "pairs_both_valid": 25602,
+    "pairs_one_valid": 47,
+    "pairs_invalid": 2,
+    "cities_excluded": [
+      101
+    ],
+    "cities_valid": 226,
+    "rtt_median_s": 0.1001515,
+    "rtt_p90_s": 0.16780775,
+    "city_assignment": "round_robin",
+    "distinct_cities_used": 226
+  },
+  "D_median": 50.0
+}

@@ -236,6 +236,19 @@ def plot(rows, solvers, out):
     plt.close(fig)
 
 
+def snapshot(rows, args) -> None:
+    """
+    Partial results and plots while the experiment runs (rounds completed so far, unordered).
+    """
+    rows = sorted(rows, key=lambda r: (r["round"], args.solvers.index(r["solver"])))
+    complete = [r for r in rows if sum(1 for x in rows if x["round"] == r["round"]) == len(args.solvers)]
+    if not complete:
+        return
+    summary = summarize(complete, args.solvers)
+    write_csv(os.path.join(args.out, "summary.partial.csv"), summary, list(summary[0]))
+    plot(complete, args.solvers, args.out)
+
+
 # ---------------------------------------------------------------------- main
 
 def main():
@@ -266,6 +279,8 @@ def main():
     parser.add_argument("--dropout", type=float, default=0.03)
     parser.add_argument("--late-prob", type=float, nargs=3, default=[0.3, 0.15, 0.05])
     parser.add_argument("--mean-lateness", type=float, default=15.0)
+    parser.add_argument("--checkpoint-every", type=int, default=10, help="write partial results and plots")
+    parser.add_argument("--resume", action="store_true", help="continue from results.partial.jsonl")
     parser.add_argument("--out", default=os.path.join(ROOT, "experiments", "results", "selection_optimality"))
     args = parser.parse_args()
     if abs(sum(args.weights) - 1) > 1e-9 or min(args.weights) <= 0:
@@ -278,13 +293,26 @@ def main():
     instances = generate_instances(args, pop, params)
     print("Population of %d clients and %d instances ready in %.1f s" % (args.N, len(instances), time.time() - started))
 
-    jobs = [(inst, args.n, params.to_dict(), args.solvers, args.exact_time, args.seed) for inst in instances]
+    partial = os.path.join(args.out, "results.partial.jsonl")
     rows = []
-    with get_context("spawn").Pool(args.workers) as pool:
-        for done, result in enumerate(pool.imap_unordered(solve_round, jobs), 1):
+    if args.resume and os.path.exists(partial):
+        with open(partial) as handle:
+            rows = [json.loads(line) for line in handle if line.strip()]
+        print("Resuming: %d rounds already solved" % len({r["round"] for r in rows}))
+    elif os.path.exists(partial):
+        os.remove(partial)
+    done_rounds = {r["round"] for r in rows}
+    jobs = [(inst, args.n, params.to_dict(), args.solvers, args.exact_time, args.seed) for inst in instances
+            if inst["round"] not in done_rounds]
+    with get_context("spawn").Pool(args.workers) as pool, open(partial, "a") as checkpoint:
+        for done, result in enumerate(pool.imap_unordered(solve_round, jobs), len(done_rounds) + 1):
             rows.extend(result)
-            if done % 10 == 0 or done == len(jobs):
-                print("%d/%d rounds solved (%.0f s)" % (done, len(jobs), time.time() - started), flush=True)
+            for row in result:
+                checkpoint.write(json.dumps(row) + "\n")
+            checkpoint.flush()
+            if done % args.checkpoint_every == 0 or done == len(instances):
+                print("%d/%d rounds solved (%.0f s)" % (done, len(instances), time.time() - started), flush=True)
+                snapshot(rows, args)
     rows.sort(key=lambda r: (r["round"], args.solvers.index(r["solver"])))
 
     summary = summarize(rows, args.solvers)
