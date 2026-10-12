@@ -10,3 +10,4 @@ tenseal
 pyyaml
 matplotlib  # scripts/plot_compass.py
 pytest  # tests/
+pyscipopt  # experiments/exact_vs_scip.py (optional)
