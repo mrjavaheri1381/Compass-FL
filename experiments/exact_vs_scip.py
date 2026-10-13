@@ -153,26 +153,49 @@ def main():
 
 
 def _compare_threads(instances, so_args, params, known):
+    from dlsim.compass.solvers import create_solver
     rows = []
+    log_path = os.path.join(known.out, "threads_M%d_n%d.log" % (so_args.M, so_args.n))
+    log = open(log_path, "a")
+
+    def say(text):
+        print(text, flush=True)
+        log.write(text + "\n")
+        log.flush()
+
+    say("== SCIP threads %s | N=%d M=%d n=%d rounds=%d time limit %.0fs | %s" % (
+        known.threads, so_args.N, so_args.M, so_args.n, len(instances), known.time_limit, time.strftime("%H:%M:%S")))
     for inst in instances:
         problem = so.to_problem(inst, so_args.n, params)
         entry = {"round": inst["round"]}
+        start = time.perf_counter()
+        greedy = create_solver("greedy_swap").solve(problem, Budget(), np.random.default_rng(0))
+        entry["greedy"] = {"time": time.perf_counter() - start, "utility": greedy.utility, "members": greedy.members}
+        say("round %3d | start %s | candidates=%d | greedy_swap U=%.6f in %.3fs" % (
+            inst["round"], time.strftime("%H:%M:%S"), problem.size, greedy.utility, entry["greedy"]["time"]))
         for threads in known.threads:
             members, elapsed, status, bound, nodes = solve_scip(problem, known.time_limit, known.verbose, threads)
             entry[threads] = {"time": elapsed, "status": status, "nodes": nodes,
                               "utility": evaluate(problem, members).utility if members is not None else None,
                               "members": members}
-            print("round %3d | SCIP threads=%d: %7.1fs %-9s U=%.6f nodes=%d" % (
-                inst["round"], threads, elapsed, status, entry[threads]["utility"], nodes), flush=True)
+            u = entry[threads]["utility"]
+            gap = 1 - greedy.utility / u if u else float("nan")
+            say("round %3d | SCIP threads=%d: %8.1fs %-9s U=%.6f dual bound=%.6f nodes=%d | greedy gap %.4f%%%s" % (
+                inst["round"], threads, elapsed, status, u if u else float("nan"), bound, nodes, 100 * gap,
+                " (same set)" if members == greedy.members else ""))
         rows.append(entry)
-    with open(os.path.join(known.out, "threads.json"), "w") as handle:
-        json.dump(rows, handle, indent=1, default=str)
+        with open(os.path.join(known.out, "threads_M%d_n%d.json" % (so_args.M, so_args.n)), "w") as handle:
+            json.dump(rows, handle, indent=1, default=str)
     base = known.threads[0]
     for threads in known.threads[1:]:
         speedups = [r[base]["time"] / r[threads]["time"] for r in rows]
         same = sum(r[base]["members"] == r[threads]["members"] for r in rows)
-        print("threads=%d vs %d: speed-up %s, same set %d/%d" % (
+        say("threads=%d vs %d: speed-up %s, same set %d/%d" % (
             threads, base, ", ".join("x%.2f" % v for v in speedups), same, len(rows)))
+    times = [r[base]["time"] for r in rows]
+    say("SCIP threads=%d: mean %.1fs, max %.1fs, optimal %d/%d" % (
+        base, np.mean(times), max(times), sum(r[base]["status"] == "optimal" for r in rows), len(rows)))
+    log.close()
 
 
 def _so_args(rounds, rest):

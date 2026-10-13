@@ -1,0 +1,35 @@
+[
+ {
+  "R_s": 3,
+  "rounds": 200,
+  "mean_gap_pct": 0.0657525757635527,
+  "p95_gap_pct": 0.37751320081531764,
+  "max_gap_pct": 1.5015756241686828,
+  "optimal_rounds": 168,
+  "mean_time_s": 0.07129986895000023,
+  "max_time_s": 0.2484529719999955,
+  "mean_evaluations": 4023.0
+ },
+ {
+  "R_s": 10,
+  "rounds": 200,
+  "mean_gap_pct": 0.007083057580923091,
+  "p95_gap_pct": 5.967725758004856e-09,
+  "max_gap_pct": 0.48666067020963766,
+  "optimal_rounds": 192,
+  "mean_time_s": 0.18465421700499982,
+  "max_time_s": 0.5787042559999946,
+  "mean_evaluations": 10691.0
+ },
+ {
+  "R_s": 20,
+  "rounds": 200,
+  "mean_gap_pct": 0.00030856288470887394,
+  "p95_gap_pct": 5.449813933466885e-09,
+  "max_gap_pct": 0.0617123079495574,
+  "optimal_rounds": 199,
+  "mean_time_s": 0.3801029208949994,
+  "max_time_s": 1.5288785360000077,
+  "mean_evaluations": 20997.0
+ }
+]
