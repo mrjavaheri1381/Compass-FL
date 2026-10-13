@@ -1,0 +1,325 @@
+\documentclass[10pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{hyperref}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}{Proposition}
+\newtheorem{lemma}{Lemma}
+\newtheorem{corollary}{Corollary}
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}
+
+\newcommand{\coh}{\varphi_{\text{coh}}}
+\newcommand{\rep}{\varphi_{\text{repr}}}
+\newcommand{\clip}{\operatorname{clip}}
+\newcommand{\C}{\mathcal{C}}
+\newcommand{\N}{\mathcal{N}}
+
+\title{Complexity and a Candidate-Count-Independent Approximation Guarantee\\for the COMPASS-FL Selection Problem}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We study the local selection problem solved by every candidate aggregator: choose $n$ clients out of $k$ neighbors so
+as to maximize the full utility $\mathcal{U}$ (bottleneck capacity, bottleneck latency, cohesion, representativeness,
+fairness, and deadline adherence). We show that the problem is NP-hard, so no polynomial algorithm is exact for every
+$k$ unless P$=$NP. We then show that a simple polynomial enumeration of \emph{center seeds} attains a fraction
+$\Gamma(\C^\star)$ of the optimum, where $\Gamma$ depends only on $n$, the weights, $\epsilon$, and statistics of the
+optimal set itself, and not on the number $k$ of candidates. Since 1-swap local search never decreases $\mathcal{U}$,
+\texttt{greedy\_swap} seeded with these sets inherits the guarantee. On realistic instances the guarantee holds but is
+loose, while the center seeds themselves are within a few percent of the optimum.
+\end{abstract}
+
+\section{Setting}
+
+\paragraph{Instance.} A candidate aggregator $a$ chooses a set $\C \subseteq \N$, $|\C| = n \ge 2$, from its
+neighborhood $\N$ of size $k = |\N|$. Each $i \in \N$ has a capacity estimate $f_i$, a latency $L_i = L_{i,a} <
+L_{\max}$, a fairness score $h_i = \min(\Delta\tau_i, \Delta\tau_{\text{cap}})/\Delta\tau_{\text{cap}} \in [0, 1]$, a
+deadline-adherence score $Q_i \in (0, 1]$, and a normalized label vector $x_i = \hat{\mathbf{y}}_i \in
+\mathbb{R}^K_{\ge 0}$, $\|x_i\| = 1$. Similarities are $S_{ij} = x_i^\top x_j \in [0, 1]$. Let $s = \sum_{j \in
+\mathcal{V}} x_j$ (so $r_i = x_i^\top s$ and $\sum_{j,j'} S_{jj'} = \|s\|^2$) and, for a set $\C$,
+\[
+z(\C) = \sum_{i \in \C} x_i, \qquad \mu_\C = z(\C)/n, \qquad P(\C) = \sum_{i < j \in \C} S_{ij} .
+\]
+
+\paragraph{Utility.} With $\clip(x) = \min(1, \max(\epsilon, x))$, $0 < \epsilon < 1$, the raw components are
+\begin{align*}
+\varphi_{\text{comp}} &= \tfrac{\min_{\C} f_i}{f_{\text{ref}}}, &
+\varphi_{\text{comm}} &= 1 - \tfrac{\max_{\C} L_i}{L_{\max}}, &
+\coh &= \tfrac{P(\C)}{\binom{n}{2}}, \\
+\rep &= \gamma \, \tfrac{\sum_{\C} r_i}{\sqrt{(n + 2P(\C))\,\|s\|^2}}, &
+\varphi_{\text{fair}} &= \tfrac{1}{n}\textstyle\sum_{\C} h_i, &
+\varphi_{\text{adh}} &= \tfrac{1}{n}\textstyle\sum_{\C} Q_i,
+\end{align*}
+where $\gamma > 0$ is the common factor introduced by estimating $\|s\|^2$ (Eq.~(repr) of the paper; $\gamma = 1$ when
+the estimate is exact). The clipped components are $\Phi_m = \clip(\varphi_m)$ for $m \in \{\text{comp},
+\text{comm}, \text{coh}, \text{repr}, \text{fair}, \text{adh}\}$, $\Phi_{\text{data}} = \clip(\Phi_{\text{coh}}^{w_c}
+\Phi_{\text{repr}}^{w_r})$, and
+\[
+\mathcal{U}(\C) = \prod_{m \in \{\text{comp}, \text{comm}, \text{data}, \text{fair}, \text{adh}\}} \Phi_m^{w_m},
+\qquad w_m > 0, \; \textstyle\sum_m w_m = 1, \qquad w_c, w_r \ge 0 .
+\]
+The problem is $\max_{\C \subseteq \N, |\C| = n} \mathcal{U}(\C)$; $\C^\star$ denotes an optimal set and starred
+quantities refer to it ($\coh^\star = \coh(\C^\star)$, etc.).
+
+\begin{lemma}[aggregate form]\label{lem:aggregate}
+For every $\C$ with $|\C| = n$: $\;\|z(\C)\|^2 = n + 2P(\C)$, hence
+\[
+\coh(\C) = \frac{\|z(\C)\|^2 - n}{n(n-1)}, \qquad
+\rep(\C) = \gamma \cos\big(z(\C), s\big), \qquad
+\|\mu_\C\|^2 = \frac{1 + (n-1)\coh(\C)}{n} .
+\]
+\end{lemma}
+\begin{proof}
+$\|z\|^2 = \sum_{i,j \in \C} x_i^\top x_j = n + 2P$ since $\|x_i\| = 1$. $\sum_{\C} r_i = z^\top s$, so $\rep = \gamma
+z^\top s / (\|z\|\|s\|)$. The last identity divides $\|z\|^2 = n + n(n-1)\coh$ by $n^2$.
+\end{proof}
+
+Thus cohesion and representativeness depend on the selection only through the $K$-dimensional vector $z(\C)$, the two
+averages through two sums, and the two bottleneck terms through two order statistics.
+
+\begin{lemma}[clipping]\label{lem:clip}
+For $a \ge 0$ and $b > 0$: $\clip(a)/\clip(b) \ge \min\{1, a/b\}$ and $\clip(a)/\clip(b) \ge \epsilon/\clip(b)$.
+\end{lemma}
+\begin{proof}
+If $a \ge b$, monotonicity of $\clip$ gives a ratio $\ge 1$. If $0 < a < b$: $x \mapsto \clip(x)/x$ equals
+$\epsilon/x$, $1$, $1/x$ on $(0,\epsilon)$, $[\epsilon,1]$, $(1,\infty)$, so it is non-increasing and
+$\clip(a)/a \ge \clip(b)/b$. If $a = 0$ the first bound is $0$. The second bound holds because $\clip(a) \ge
+\epsilon$.
+\end{proof}
+
+\section{Hardness}
+
+\begin{proposition}\label{prop:hard}
+For any fixed weights with $w_c \ge w_r/2$ (in particular for $w_c + w_r = 1$, $w_c \ge 1/3$, which includes the
+default $w_c = w_r = 1/2$) and any $\epsilon < 1/2$, deciding whether some $\C$ with $|\C| = n$ has $\mathcal{U}(\C)
+\ge \mathcal{U}_0$ is NP-hard.
+\end{proposition}
+\begin{proof}
+Reduction from \textsc{Clique} on $d$-regular graphs, which remains NP-complete.\footnote{This is a standard fact;
+the reference to cite should be checked by the author before the proposition is used in the paper.} Given a
+$d$-regular graph $G = (V, E)$ with $d \ge 2$ and an integer $n \ge 3$, use one label per edge plus one shared label
+$0$, and give node $i$ the label counts $y_i[e] = 1$ for every edge $e$ incident to $i$ and $y_i[0] = t$, with an
+integer $t \ge \sqrt{d}$. Then $\|y_i\|^2 = d + t^2$ and
+\[
+S_{ij} = \frac{A_{ij} + t^2}{d + t^2} \qquad (i \ne j),
+\]
+where $A$ is the adjacency matrix. Set every $f_i = f_{\text{ref}}$, $L_i = L_{\max}/2$, $\Delta\tau_i =
+\Delta\tau_{\text{cap}}$, $Q_i = 1$, $\gamma = 1$, and $\N = V$. For $|\C| = n$ let $e(\C)$ be the number of edges of
+$G$ inside $\C$ and $A(\C) = e(\C) + t^2 \binom{n}{2}$. Then $P = A/(d+t^2)$ and, by Lemma~\ref{lem:aggregate},
+$\|z\|^2 = n + 2A/(d+t^2)$. Every node has $x_i^\top s = (2d + |V| t^2)/(d+t^2)$, so $z^\top s$ is the same for all
+$\C$. Hence
+\[
+\log \mathcal{U}(\C) = \text{const} + w_{\text{data}} \Big[ w_c \log A - \tfrac{w_r}{2} \log\big(n(d+t^2) + 2A\big)
+\Big] ,
+\]
+provided no component is clipped. Its derivative with respect to $A$ is
+\[
+\frac{w_c}{A} - \frac{w_r}{n(d+t^2) + 2A} > \frac{w_c}{A} - \frac{w_r}{2A} \ge 0 ,
+\]
+so $\mathcal{U}$ is strictly increasing in $e(\C)$. No component is clipped: $\coh \in [t^2/(d+t^2), (1+t^2)/(d+t^2)]
+\subset [1/2, 1)$; $\rep \ge \sqrt{t^2/(d+t^2)} \ge 1/\sqrt{2}$ (using $\|z\| \le n$); $\Phi_{\text{data}} \ge 1/2$;
+$\Phi_{\text{comm}} = 1/2$; and the other components equal $1$. Therefore $G$ has a clique of size $n$ if and only if
+$\max_\C \mathcal{U}(\C) \ge \mathcal{U}_0$, where $\mathcal{U}_0$ is the utility of a set with $e = \binom{n}{2}$.
+The instance has polynomial size.
+\end{proof}
+
+\begin{remark}
+The construction uses $K = |E| + 1$ labels. Hardness for a \emph{fixed} number of labels (e.g., $K = 10$) is not
+implied, and the problem may well be polynomial (but with a degree growing in $K$) in that regime.
+\end{remark}
+
+\section{Center seeds and the approximation guarantee}
+
+\begin{definition}[center seed]
+For an eligible set $E \subseteq \N$ and $c \in E$, the \emph{center seed} $\C_c(E)$ consists of $c$ and the $n-1$
+nodes of $E \setminus \{c\}$ with the largest $S_{c,j}$ (ties broken arbitrarily). Algorithm \textsc{Center}
+enumerates every threshold tuple $(\phi, \lambda, \alpha, \beta)$ with $\phi \in \{f_i\}$, $\lambda \in \{L_i\}$,
+$\alpha \in \{h_i\}$, $\beta \in \{Q_i\}$, forms $E = \{i \in \N : f_i \ge \phi, L_i \le \lambda, h_i \ge \alpha,
+Q_i \ge \beta\}$, and, if $|E| \ge n$, evaluates $\C_c(E)$ for every $c \in E$. It returns the evaluated set with
+the largest $\mathcal{U}$.
+\end{definition}
+
+\begin{lemma}[the member nearest to the centroid]\label{lem:centroid}
+Let $\mu^\star = \mu_{\C^\star}$, $q^\star = \|\mu^\star\|^2 = (1 + (n-1)\coh^\star)/n$, and let $c \in \C^\star$
+minimize $\|x_c - \mu^\star\|$ (equivalently, maximize $\sum_{j \in \C^\star} S_{cj}$). Then
+\[
+\text{(a)}\;\; \|x_c - \mu^\star\|^2 \le 1 - q^\star, \qquad
+\text{(b)}\;\; x_c^\top \mu^\star \ge q^\star, \qquad
+\text{(c)}\;\; \sigma_c := \sum_{j \in \C^\star \setminus \{c\}} S_{cj} \ge (n-1)\,\coh^\star .
+\]
+\end{lemma}
+\begin{proof}
+For unit vectors, $\frac{1}{n}\sum_{i \in \C^\star} \|x_i - \mu^\star\|^2 = 1 - \|\mu^\star\|^2$; the minimum is at
+most the average, which gives (a). Expanding (a), $1 - 2x_c^\top\mu^\star + q^\star \le 1 - q^\star$, which is (b).
+Finally $\sigma_c = n\, x_c^\top \mu^\star - 1 \ge n q^\star - 1 = (n-1)\coh^\star$.
+\end{proof}
+
+Fix from now on the thresholds of the optimum, $\phi^\star = \min_{\C^\star} f_i$, $\lambda^\star = \max_{\C^\star}
+L_i$, $\alpha^\star = \min_{\C^\star} h_i$, $\beta^\star = \min_{\C^\star} Q_i$, the corresponding eligible set
+$E^\star \supseteq \C^\star$, the center $c$ of Lemma~\ref{lem:centroid}, and $\C_c = \C_c(E^\star)$. Let $T =
+\sum_{j \in \C_c \setminus \{c\}} S_{cj}$.
+
+\begin{lemma}[cohesion]\label{lem:coh}
+$T \ge (n-1)\coh^\star$ and $\;\coh(\C_c) \ge \max\big\{ 2\coh^\star - 1,\; \tfrac{2}{n}\coh^\star \big\}$.
+\end{lemma}
+\begin{proof}
+$\C^\star \setminus \{c\}$ is an $(n-1)$-subset of $E^\star \setminus \{c\}$, and $\C_c \setminus \{c\}$ maximizes the
+sum of similarities to $c$ over such subsets, so $T \ge \sigma_c \ge (n-1)\coh^\star$ by Lemma~\ref{lem:centroid}(c).
+Since $S \ge 0$, $P(\C_c) \ge T$, which gives $\coh(\C_c) \ge T/\binom{n}{2} \ge \frac{2}{n}\coh^\star$. For the
+other bound, let $D(\C) = \sum_{i<j \in \C} \|x_i - x_j\|^2 = n(n-1) - 2P(\C) = n(n-1)(1 - \coh(\C))$. The identity
+$D(\C) = n \sum_{i \in \C} \|x_i - \mu_\C\|^2$ and the fact that the centroid minimizes the sum of squared distances
+give
+\[
+D(\C_c) \le n \sum_{i \in \C_c} \|x_i - x_c\|^2 = 2n(n-1-T) \le 2n(n-1)(1 - \coh^\star),
+\]
+that is, $1 - \coh(\C_c) \le 2(1 - \coh^\star)$.
+\end{proof}
+
+\begin{lemma}[representativeness]\label{lem:repr}
+Let $\theta^\star = \angle(\mu^\star, s) \in [0, \pi/2]$, $\rho^\star = (1 + \sqrt{2})\sqrt{1 - q^\star}$ and
+$\beta^\star_{\angle} = \arcsin(\rho^\star/\sqrt{q^\star})$ if $\rho^\star < \sqrt{q^\star}$, else $\pi/2$. Then
+\[
+\rep(\C_c) \ge \gamma \cos\big(\min\{\pi/2,\; \theta^\star + \beta^\star_{\angle}\}\big) .
+\]
+\end{lemma}
+\begin{proof}
+By Jensen's inequality and Lemma~\ref{lem:coh}, $\|\mu_{\C_c} - x_c\|^2 \le \frac{1}{n}\sum_{i \in \C_c} \|x_i -
+x_c\|^2 = \frac{2(n-1-T)}{n} \le \frac{2(n-1)(1-\coh^\star)}{n} = 2(1 - q^\star)$. With Lemma~\ref{lem:centroid}(a)
+and the triangle inequality, $\|\mu_{\C_c} - \mu^\star\| \le \rho^\star$. If $\|u - v\| \le \rho < \|v\|$, then
+$\angle(u, v) \le \arcsin(\rho/\|v\|)$; here $\|\mu^\star\| = \sqrt{q^\star}$. The angle is a metric on the sphere, so
+$\angle(\mu_{\C_c}, s) \le \theta^\star + \beta^\star_\angle$. All vectors are non-negative, so every angle is at most
+$\pi/2$, and $\cos$ is decreasing on $[0, \pi/2]$. Lemma~\ref{lem:aggregate} completes the proof.
+\end{proof}
+
+\begin{theorem}[approximation, independent of $k$]\label{thm:main}
+Let
+\begin{align*}
+\Gamma_{\text{coh}} &= \max\Big\{ 2 - \tfrac{1}{\coh^\star},\; \tfrac{2}{n},\; \tfrac{\epsilon}{\Phi_{\text{coh}}^\star}
+\Big\} \;\;(\text{$1$ if } \coh^\star = 0), &
+\Gamma_{\text{repr}} &= \max\Big\{ \tfrac{\cos(\min\{\pi/2,\, \theta^\star + \beta^\star_\angle\})}{\cos\theta^\star},\;
+\tfrac{\epsilon}{\Phi_{\text{repr}}^\star} \Big\}, \\
+\kappa_{\text{fair}} &= \frac{\min_{i \in \C^\star} h_i}{\frac{1}{n}\sum_{i \in \C^\star} h_i}, &
+\kappa_{\text{adh}} &= \frac{\min_{i \in \C^\star} Q_i}{\frac{1}{n}\sum_{i \in \C^\star} Q_i},
+\end{align*}
+($\kappa_{\text{fair}} = 1$ if all $h_i = 0$ in $\C^\star$). Then \textsc{Center} returns a set $\C$ with
+\[
+\mathcal{U}(\C) \;\ge\; \Gamma(\C^\star)\, \mathcal{U}(\C^\star), \qquad
+\Gamma(\C^\star) = \big(\Gamma_{\text{coh}}^{w_c}\, \Gamma_{\text{repr}}^{w_r}\big)^{w_{\text{data}}}\,
+\kappa_{\text{fair}}^{w_{\text{fair}}}\, \kappa_{\text{adh}}^{w_{\text{adh}}} .
+\]
+$\Gamma$ depends only on $n$, $\epsilon$, the weights, and statistics of $\C^\star$; it does not depend on $k$ or on
+the candidates outside $\C^\star$. \textsc{Center} runs in time $O(k^5 (k + n^2))$.
+\end{theorem}
+\begin{proof}
+$\C_c$ is among the sets evaluated by \textsc{Center}: the thresholds of $\C^\star$ are values of the enumeration,
+$|E^\star| \ge n$, and $c \in \C^\star \subseteq E^\star$. It therefore suffices to show $\mathcal{U}(\C_c) \ge
+\Gamma\, \mathcal{U}(\C^\star)$, and since $\mathcal{U}$ is a weighted geometric mean it suffices to bound each ratio
+$\Phi_m(\C_c)/\Phi_m^\star$.
+
+\emph{Bottlenecks.} $\C_c \subseteq E^\star$, so $\min_{\C_c} f_i \ge \phi^\star$ and $\max_{\C_c} L_i \le
+\lambda^\star$; both raw components are at least those of $\C^\star$ and, by monotonicity of $\clip$, so are the
+clipped ones.
+
+\emph{Averages.} Every member of $\C_c$ has $h_i \ge \alpha^\star$ and $Q_i \ge \beta^\star$, so
+$\varphi_{\text{fair}}(\C_c) \ge \alpha^\star = \kappa_{\text{fair}}\varphi_{\text{fair}}^\star$ and likewise for
+adherence. Lemma~\ref{lem:clip} transfers the ratios to the clipped components ($\kappa \le 1$).
+
+\emph{Data.} By Lemmas~\ref{lem:coh}, \ref{lem:repr} and \ref{lem:clip}, $\Phi_{\text{coh}}(\C_c) \ge
+\Gamma_{\text{coh}}\Phi^\star_{\text{coh}}$ and $\Phi_{\text{repr}}(\C_c) \ge \Gamma_{\text{repr}}
+\Phi^\star_{\text{repr}}$ (for representativeness, $\gamma$ cancels in the ratio of the raw values). Hence the
+argument of the outer clip of $\Phi_{\text{data}}$ is at least $\Gamma_{\text{coh}}^{w_c}\Gamma_{\text{repr}}^{w_r}$
+times that of $\C^\star$, and Lemma~\ref{lem:clip} applies once more, all factors being at most $1$.
+
+Multiplying the ratios with exponents $w_m$ gives the claim. For the running time, there are at most $k^4$ threshold
+tuples and $k$ centers each; a seed is formed in $O(k)$ (selection) and evaluated in $O(n^2)$.
+\end{proof}
+
+\begin{corollary}[additive utility]
+For $\mathcal{U}_{\text{add}} = \sum_m w_m \Phi_m$, \textsc{Center} returns $\C$ with
+\[
+\mathcal{U}_{\text{add}}(\C) \ge \min\{\Gamma_{\text{coh}}^{w_c}\Gamma_{\text{repr}}^{w_r},\, \kappa_{\text{fair}},\,
+\kappa_{\text{adh}}\}\, \mathcal{U}_{\text{add}}(\C^\star),
+\]
+where all quantities refer to the additive optimum $\C^\star$.
+\end{corollary}
+\begin{proof}
+The proof of Theorem~\ref{thm:main} bounds each $\Phi_m(\C_c) \ge \Gamma_m \Phi_m^\star$ using only properties of
+$\C^\star$; sum with weights $w_m$.
+\end{proof}
+
+\begin{corollary}[\texttt{greedy\_swap} with center seeds]
+If the seeds of \texttt{greedy\_swap} include the center seeds of \textsc{Center} (in addition to, or instead of, the
+$R_s$ best pairs), its output $\C$ satisfies $\mathcal{U}(\C) \ge \Gamma(\C^\star)\,\mathcal{U}(\C^\star)$ for every
+$k$, because greedy completion is not needed for a seed of size $n$ and each accepted 1-swap strictly increases
+$\mathcal{U}$.
+\end{corollary}
+
+\section{Remarks}
+
+\begin{remark}[what the guarantee does and does not say]
+The theorem answers how the worst-case quality depends on the number of candidates: it does not degrade as $k$
+grows, because the guarantee is expressed only in terms of the optimal set. It is, however, a worst-case bound and is
+loose. $\Gamma_{\text{repr}}$ is non-trivial only if $\rho^\star < \sqrt{q^\star}$, i.e.\ $q^\star > (1+\sqrt2)^2 /
+(1 + (1+\sqrt2)^2) \approx 0.854$, which for $n = 10$ requires $\coh^\star \gtrsim 0.84$; otherwise only the clipping
+floor $\epsilon/\Phi^\star_{\text{repr}}$ remains. Likewise $2 - 1/\coh^\star$ is positive only for $\coh^\star >
+1/2$, and $\kappa_{\text{fair}}$ is small whenever the optimum mixes recently selected and long-waiting nodes.
+\end{remark}
+
+\begin{remark}[practical variant]
+Enumerating only the capacity and latency thresholds (\textsc{Center-2}, $O(k^3(k + n^2))$) keeps the bottleneck and
+data bounds; the fairness and adherence factors then become $\min_{E^\star} h_i / \bar{h}^\star$ and $\min_{E^\star}
+Q_i/\bar{Q}^\star$, which depend on the candidate pool.
+\end{remark}
+
+\begin{remark}[noisy similarities]
+With CKKS and differential-privacy noise, the matrix $\tilde S$ used by the protocol is not exactly a Gram matrix,
+which the proofs of Lemmas~\ref{lem:centroid}--\ref{lem:repr} use. If $|\tilde S_{ij} - S_{ij}| \le \eta$, the
+selection step of $\C_c$ loses at most $2(n-1)\eta$ in $T$, so Lemma~\ref{lem:coh} holds with an additional $-4\eta$;
+a full perturbation analysis of the theorem is left open.
+\end{remark}
+
+\section{Numerical check}
+
+The script \texttt{approximation\_bound.py} (in \texttt{experiments/}) evaluates the theorem on the 200
+instances of \texttt{selection\_optimality.py} ($k = 50$, $n = 10$, $N = 1000$, Dirichlet $\alpha = 0.3$, default
+weights), whose optima were certified by branch and bound. For every instance it computes $\Gamma(\C^\star)$, the ratio
+$\mathcal{U}(\C_c)/\mathcal{U}^\star$ of the seed used in the proof, and the ratios of \textsc{Center-2} without and
+with 1-swap local search.
+
+\begin{center}
+\begin{tabular}{lcccc}
+\toprule
+quantity & min & median & mean & max \\
+\midrule
+$\Gamma(\C^\star)$ (Theorem~\ref{thm:main}) & 0.243 & 0.394 & 0.391 & 0.436 \\
+$\mathcal{U}(\C_c)/\mathcal{U}^\star$ (seed of the proof) & 0.95 & 1 & 0.996 & 1 \\
+\textsc{Center-2} / $\mathcal{U}^\star$ & 0.973 & 0.994 & 0.992 & 1 \\
+\textsc{Center-2} + 1-swap / $\mathcal{U}^\star$ & 0.984 & 1 & 0.999 & 1 \\
+$\coh^\star$ & 0.266 & 0.395 & 0.393 & 0.556 \\
+$\Gamma_{\text{coh}}$ & 0.2 & 0.2 & 0.2 & 0.201 \\
+$\Gamma_{\text{repr}}$ & 0.00103 & 0.00112 & 0.00113 & 0.0014 \\
+$\kappa_{\text{fair}}$ & 0.0676 & 0.741 & 0.735 & 1 \\
+$\kappa_{\text{adh}}$ & 0.567 & 0.853 & 0.864 & 1 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The inequality $\mathcal{U}(\C_c) \ge \Gamma\,\mathcal{U}^\star$ held in all 200 instances. On these instances the
+optimum has cohesion between 0.27 and 0.56, so $\Gamma_{\text{coh}} = 2/n$ and $\Gamma_{\text{repr}}$ is reduced to its
+clipping floor $\epsilon/\Phi^\star_{\text{repr}}$. The resulting $\Gamma$ (median 0.39) is driven mostly by the small
+elasticities $w_{\text{data}} w_c = w_{\text{data}} w_r = 0.1$: the trivial bound obtained by replacing the whole data
+factor by its clipping floor, $(\epsilon/\Phi^\star_{\text{data}})^{w_{\text{data}}}\kappa_{\text{fair}}^{w_{\text{fair}}}
+\kappa_{\text{adh}}^{w_{\text{adh}}}$, already gives a median of 0.25. In contrast, the seed of the proof reaches at
+least 0.950 of the optimum (median 1), \textsc{Center-2} at least 0.973, and \textsc{Center-2} followed by 1-swap at least
+0.984. The guarantee should therefore be presented as a qualitative statement (the worst case does not degrade with
+$k$), not as an estimate of the gap, which is measured directly; the center seeds themselves are a strong and cheap
+initialization.
+
+\end{document}
