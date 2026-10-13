@@ -160,7 +160,7 @@ class PopulationView:
         if measurement is not None and measurement.censored and math.isfinite(lateness):
             lateness = 0.0  # Congested uploads never count as late (RQ1)
 
-        # 1. Reliability
+        # 1. Deadline adherence (Q)
         state.Q = est.update_q(state.Q, lateness, alpha, gamma)
 
         if measurement is not None and math.isfinite(lateness) and measurement.T_cmp > 0:

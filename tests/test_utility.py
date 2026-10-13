@@ -32,7 +32,7 @@ def test_components_match_definitions():
     pairs = [problem.S[i, j] for i, j in itertools.combinations(members, 2)]
     assert comps["coh"] == pytest.approx(sum(pairs) / len(pairs))
     assert comps["fair"] == pytest.approx(np.mean(np.minimum(problem.stale[members], p.dtau_cap) / p.dtau_cap))
-    assert comps["strag"] == pytest.approx(problem.Q[members].mean())
+    assert comps["adh"] == pytest.approx(problem.Q[members].mean())
     assert comps["data"] == pytest.approx(comps["coh"] ** p.w_c * comps["repr"] ** p.w_r)
     u = evaluate(problem, members).utility
     w = p.weight_map
@@ -81,9 +81,9 @@ def test_incremental_equals_full(seed):
 
 def test_weight_validation_fails_loudly():
     with pytest.raises(ConfigError):
-        validate_weights({"comp": 0.0, "comm": 0.25, "data": 0.25, "fair": 0.25, "strag": 0.25})
+        validate_weights({"comp": 0.0, "comm": 0.25, "data": 0.25, "fair": 0.25, "adh": 0.25})
     with pytest.raises(ConfigError):
-        validate_weights({"comp": 0.3, "comm": 0.3, "data": 0.3, "fair": 0.3, "strag": 0.3})
+        validate_weights({"comp": 0.3, "comm": 0.3, "data": 0.3, "fair": 0.3, "adh": 0.3})
     with pytest.raises(ConfigError):
         load_config(overrides=["utility.weights.comm=0.5"])
     with pytest.raises(ConfigError):
@@ -92,3 +92,14 @@ def test_weight_validation_fails_loudly():
         load_config(overrides=["utility.no_such_key=1"])
     config = load_config(overrides=["utility.w_c=0", "solver=tabu", "weights.comm=0.3", "weights.comp=0.1", "seed=3"])
     assert config.utility.w_c == 0 and config.solver.name == "tabu" and config.seed == 3
+
+
+def test_legacy_strag_weight_key_still_accepted(tmp_path):
+    """Configs and run logs written before the rename of Phi_strag to Phi_adh keep loading."""
+    from dlsim.compass.config import config_from_dict, load_config
+    weights = {"comp": 0.2, "comm": 0.2, "data": 0.2, "fair": 0.1, "strag": 0.3}
+    assert config_from_dict({"utility": {"weights": weights}}).utility.weights.adh == 0.3
+    assert load_config(overrides=["weights.strag=0.3", "weights.fair=0.1"]).utility.weights.adh == 0.3
+    path = tmp_path / "old.yaml"
+    path.write_text("utility:\n  weights: {comp: 0.2, comm: 0.2, data: 0.2, fair: 0.1, strag: 0.3}\n")
+    assert load_config([str(path)]).utility.weights.adh == 0.3

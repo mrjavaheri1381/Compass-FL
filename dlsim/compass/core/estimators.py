@@ -1,5 +1,5 @@
 """
-Capacity, bandwidth, completion-time and reliability estimators (paper Sec. 3.3).
+Capacity, bandwidth, completion-time and deadline-adherence estimators (paper Sec. 3.3).
 
     T_cmp = t_first - t_ack,  T_up = t_last - t_first
     f_hat = E D c / T_cmp,    B_hat = Z / T_up

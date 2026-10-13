@@ -10,7 +10,7 @@ distributions (similarities S and row sums r over the whole population). Every r
   3. ``exact`` (branch-and-bound, warm-started by greedy_swap) gives the optimum, certified, or an upper bound if
      it hits its time limit, so every reported gap is a guaranteed bound;
   4. the state evolves as in the protocol: the clients chosen by the driver solver (greedy_swap, the paper's
-     default) get tau_i <- t and a reliability update from a simulated lateness.
+     default) get tau_i <- t and an adherence (Q) update from a simulated lateness.
 
 All local-search solvers evaluate moves incrementally (``IncrementalState``: a swap or an addition only subtracts
 what leaves and adds what enters, O(1) per move). Rounds are independent once generated, so they are solved in
@@ -78,7 +78,7 @@ def make_params(args, pop):
     rtt = pop["rtt"][~np.eye(args.N, dtype=bool)]
     L_max = args.L_max if args.L_max > 0 else float(rtt.max()) * 1.01  # every candidate reachable (50 candidates)
     f_ref = float(np.percentile(pop["f"], 75))
-    weights = dict(zip(("comp", "comm", "data", "fair", "strag"), args.weights))
+    weights = dict(zip(("comp", "comm", "data", "fair", "adh"), args.weights))
     return UtilityParams.create(args.form, weights, args.w_c, args.w_r, f_ref, L_max, args.dtau_cap, args.eps)
 
 

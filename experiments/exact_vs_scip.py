@@ -12,7 +12,7 @@ MINLP (multiplicative utility, maximized in log space):
     P = sum_{i<j} S_ij y_ij,  R = sum r_i x_i,  F = sum fair_i x_i,  G = sum Q_i x_i
     max  w_comp log(z / f_ref) + w_comm log(1 - w / L_max)
          + w_data [ w_c log(P / C(n,2)) + w_r (log R - 0.5 log((n + 2P) net)) ]
-         + w_fair log(F / n) + w_strag log(G / n)
+         + w_fair log(F / n) + w_adh log(G / n)
 The -log(n + 2P) part is not concave, so SCIP solves the problem by spatial branch-and-bound (global optimality).
 Lower clipping at epsilon is not modeled; the chosen set is re-evaluated with the paper's utility afterwards.
 
@@ -82,7 +82,7 @@ def solve_scip(problem, time_limit: float, verbose: bool = False, threads: int =
     objective = (w["comp"] * log(z / p.f_ref) + w["comm"] * log(1 - wl / p.L_max)
                  + w["data"] * (p.w_c * log(P / pairs + 1e-12) + p.w_r * (log(R) - 0.5 * log(n + 2 * P)
                                                                          - 0.5 * math.log(problem.net_sum)))
-                 + w["fair"] * log(F / n) + w["strag"] * log(G / n))
+                 + w["fair"] * log(F / n) + w["adh"] * log(G / n))
     m.addCons(t <= objective)
     m.setObjective(t, "maximize")
     start = time.perf_counter()

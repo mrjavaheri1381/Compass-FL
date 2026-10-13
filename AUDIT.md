@@ -587,3 +587,11 @@ alpha = 0.3, losing 2.6% of the total weight), and the capped value is used ever
   priors f_bar, B_bar, sigma_bar; D_max), initialization paragraph, the sigma_bar equation (over all devices), the
   population-view paragraph, the security discussion and the limitations.
 
+
+### 7.6 Phi_strag renamed to deadline adherence Phi_adh (2026-10-13, approved by the author)
+
+Q_i measures lateness against the node's own predicted deadline (mu_i + z sigma_i), not speed: predictable slowness is
+already penalized by Phi_comp. The term is therefore called deadline adherence. Config key `utility.weights.adh`
+(`weights.strag` in old YAML files, overrides and run logs is still accepted and renamed on load); the logged component
+is `adh`. Paper: Phi_adh, w_adh, "deadline-adherence score Q_i", label `eq:adherence_score`, and one sentence that
+contrasts Phi_adh with Phi_comp. "Straggler" still names a client that misses its deadline.

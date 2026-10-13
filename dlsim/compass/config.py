@@ -18,7 +18,7 @@ from typing import Any, Dict, List, Optional, Sequence
 
 import yaml
 
-COMPONENTS = ("comp", "comm", "data", "fair", "strag")
+COMPONENTS = ("comp", "comm", "data", "fair", "adh")
 
 # Short aliases accepted on the command line: whole-key aliases (``solver=tabu`` means ``solver.name=tabu``) and
 # prefix aliases (``weights.comm=0.3`` means ``utility.weights.comm=0.3``).
@@ -37,6 +37,18 @@ ALIASES = {
 PREFIX_ALIASES = {
     "weights": "utility.weights",
 }
+RENAMED = {"utility.weights.strag": "utility.weights.adh"}  # Old key -> new key (old configs and run logs keep working)
+
+
+def _rename_legacy(tree: Dict) -> Dict:
+    for old, new in RENAMED.items():
+        *path, leaf = old.split(".")
+        node = tree
+        for part in path:
+            node = node.get(part) if isinstance(node, dict) else None
+        if isinstance(node, dict) and leaf in node:
+            node[new.rsplit(".", 1)[1]] = node.pop(leaf)
+    return tree
 
 
 @dataclass
@@ -193,7 +205,7 @@ class WeightsConfig:
     comm: float = 0.2
     data: float = 0.2
     fair: float = 0.2
-    strag: float = 0.2
+    adh: float = 0.2                  # Deadline adherence (formerly "strag")
 
 
 @dataclass
@@ -477,6 +489,7 @@ def parse_override(text: str):
         key = ALIASES[head]
     elif rest and head in PREFIX_ALIASES:
         key = PREFIX_ALIASES[head] + "." + rest
+    key = RENAMED.get(key, key)
     value = yaml.safe_load(raw) if raw.strip() != "" else ""
     return key, value
 
@@ -513,7 +526,7 @@ def load_config(paths: Sequence[str] = (), overrides: Sequence[str] = ()) -> Com
 def _read_yaml_with_base(path: str) -> Dict:
     import os
     with open(path) as handle:
-        data = yaml.safe_load(handle) or {}
+        data = _rename_legacy(yaml.safe_load(handle) or {})
     base = data.pop("base", None)
     if base:
         base_path = base if os.path.isabs(base) else os.path.join(os.path.dirname(path), base)
@@ -522,7 +535,7 @@ def _read_yaml_with_base(path: str) -> Dict:
 
 
 def config_from_dict(data: Dict) -> CompassConfig:
-    config = _build(CompassConfig, _merge(CompassConfig().to_dict(), data), "")
+    config = _build(CompassConfig, _merge(CompassConfig().to_dict(), _rename_legacy(copy.deepcopy(data))), "")
     validate(config)
     return config
 

@@ -67,7 +67,7 @@ protocol:
     prefetch: false
 utility:
   form: multiplicative         # multiplicative | additive
-  weights: {comp: 0.2, comm: 0.2, data: 0.2, fair: 0.2, strag: 0.2}   # w (strictly positive, sum 1)
+  weights: {comp: 0.2, comm: 0.2, data: 0.2, fair: 0.2, adh: 0.2}   # w (strictly positive, sum 1)
   w_c: 0.5                     # cohesion exponent (0 removes cohesion)
   w_r: 0.5                     # representativeness exponent
   f_ref: 0.0                   # 0 = 75th percentile of the true capacities

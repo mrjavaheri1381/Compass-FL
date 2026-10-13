@@ -100,9 +100,11 @@ def main() -> None:
     # Phi components
     fig, ax = plt.subplots(figsize=(7, 4))
     for run, rows in data.items():
-        for key in ("comp", "comm", "coh", "repr", "fair", "strag"):
-            points = [(r["round"], r["selection"]["components"][key]) for r in rows
-                      if r.get("selection", {}).get("components", {}).get(key) is not None]
+        for key in ("comp", "comm", "coh", "repr", "fair", "adh"):
+            def value(r, key=key):  # Runs logged before the rename call adherence "strag"
+                comps = r.get("selection", {}).get("components", {})
+                return comps.get(key, comps.get("strag") if key == "adh" else None)
+            points = [(r["round"], value(r)) for r in rows if value(r) is not None]
             if points:
                 ax.plot(*zip(*points), label="%s %s" % (run, key), linewidth=1)
         points = [(r["round"], r["selection"]["utility"]) for r in rows

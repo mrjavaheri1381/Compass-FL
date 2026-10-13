@@ -8,7 +8,7 @@ component, so bounding every component separately gives a valid bound:
 
     Phi_comp  <= min(f_min(C), need-th largest f in R) / f_ref
     Phi_comm  <= 1 - max(L_max(C), need-th smallest L in R) / L_max
-    Phi_fair  <= (fair(C) + top-need fair in R) / n,   same for Phi_strag
+    Phi_fair  <= (fair(C) + top-need fair in R) / n,   same for Phi_adh
     P_final   <= P + top-need sigma_v(C) in R + C(need, 2) max_{a<b in R} S_ab      -> Phi_coh upper bound
     P_final   >= P + bottom-need sigma_v(C) in R + C(need, 2) min_{a<b in R} S_ab   -> Phi_repr upper bound
     R_final   <= R + top-need r in R                                                   (Phi_repr = R / sqrt((n + 2P) net))

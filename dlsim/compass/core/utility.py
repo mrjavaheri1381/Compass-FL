@@ -9,10 +9,10 @@ For a candidate aggregator a and a client set C drawn from its neighborhood:
     Phi_repr  = sum_{i in C} r_i / sqrt((|C| + 2 P) * net_sum)        (P = sum_{i<j in C} S_ij)
     Phi_data  = Phi_coh^w_c * Phi_repr^w_r
     Phi_fair  = mean_{i in C} min(dtau_i, dtau_cap) / dtau_cap
-    Phi_strag = mean_{i in C} Q_i
+    Phi_adh   = mean_{i in C} Q_i    (deadline adherence)
 
 Every component is clipped to [eps, 1]. U is the weighted product (multiplicative, default) or the weighted sum
-(additive) of (comp, comm, data, fair, strag). Partial sets use |C| in place of n.
+(additive) of (comp, comm, data, fair, adh). Partial sets use |C| in place of n.
 
 All values are computed from a handful of set aggregates (size, min f, max L, P, R, fairness sum, Q sum), so the full
 evaluation and the O(1) incremental evaluation used by the solvers share exactly the same formula.
@@ -23,7 +23,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
-COMPONENTS = ("comp", "comm", "data", "fair", "strag")
+COMPONENTS = ("comp", "comm", "data", "fair", "adh")
 
 
 @dataclass(frozen=True)
@@ -50,7 +50,7 @@ class UtilityParams:
         u = config.utility
         w = u.weights
         return cls.create(u.form, {"comp": w.comp, "comm": w.comm, "data": w.data, "fair": w.fair,
-                                   "strag": w.strag}, u.w_c, u.w_r, f_ref, L_max, u.dtau_cap, u.eps)
+                                   "adh": w.adh}, u.w_c, u.w_r, f_ref, L_max, u.dtau_cap, u.eps)
 
     @property
     def weight_map(self) -> Dict[str, float]:
@@ -78,7 +78,7 @@ class SelectionProblem:
     f: np.ndarray             # Capacity estimates f_i (view snapshot)
     L: np.ndarray             # RTT L_{i,a}
     stale: np.ndarray         # dtau_i
-    Q: np.ndarray             # Reliability Q_i
+    Q: np.ndarray             # Deadline-adherence score Q_i
     r: np.ndarray             # Row sums r_i
     S: np.ndarray             # Pairwise similarities (diag = 1)
     net_sum: float            # Estimate of sum_{j,j' in V} S_jj'
@@ -118,7 +118,7 @@ class SelectionProblem:
 @dataclass
 class Evaluation:
     utility: float
-    components: Dict[str, float]  # comp, comm, coh, repr, data, fair, strag (clipped)
+    components: Dict[str, float]  # comp, comm, coh, repr, data, fair, adh (clipped)
 
 
 def _clip(value: float, eps: float) -> float:
@@ -131,7 +131,7 @@ def components_from_aggregates(params: UtilityParams, size: int, min_f: float, m
                                fair_sum: float, q_sum: float, net_sum: float) -> Dict[str, float]:
     eps = params.eps
     if size <= 0:
-        return {"comp": eps, "comm": eps, "coh": eps, "repr": eps, "data": eps, "fair": eps, "strag": eps}
+        return {"comp": eps, "comm": eps, "coh": eps, "repr": eps, "data": eps, "fair": eps, "adh": eps}
     comp = _clip(min_f / params.f_ref, eps) if params.f_ref > 0 else 1.0
     comm = _clip(1.0 - max_L / params.L_max, eps) if params.L_max > 0 else 1.0
     coh = _clip(P / (size * (size - 1) / 2.0), eps) if size >= 2 else 1.0
@@ -145,8 +145,8 @@ def components_from_aggregates(params: UtilityParams, size: int, min_f: float, m
         data *= rep ** params.w_r
     data = _clip(data, eps)
     fair = _clip(fair_sum / size, eps)
-    strag = _clip(q_sum / size, eps)
-    return {"comp": comp, "comm": comm, "coh": coh, "repr": rep, "data": data, "fair": fair, "strag": strag}
+    adh = _clip(q_sum / size, eps)
+    return {"comp": comp, "comm": comm, "coh": coh, "repr": rep, "data": data, "fair": fair, "adh": adh}
 
 
 def utility_from_components(params: UtilityParams, components: Dict[str, float]) -> float:
@@ -180,7 +180,7 @@ def evaluate(problem: SelectionProblem, members: Sequence[int]) -> Evaluation:
 class IncrementalState:
     """
     Incremental bookkeeping of a client set (paper Sec. 4.5): sigma_v = sum_{j in C} S_vj for every neighbor v, the sums
-    P and R, the fairness and reliability sums, and the two smallest capacities and two largest latencies in C. Adding
+    P and R, the fairness and adherence sums, and the two smallest capacities and two largest latencies in C. Adding
     a node or evaluating a swap costs O(1); applying a swap costs O(k).
 
     Note: the paper's P' = P - sigma_u + sigma_v - S_uv holds when sigma_u excludes the diagonal term S_uu of the member

@@ -227,7 +227,7 @@ snapshot and forwarded to A(t+1) if the handover already happened. The `plexus` 
 | n | `protocol.n` | k_nb | `protocol.k_nb` |
 | L_max (RTT) | `protocol.L_max` or `protocol.L_max_percentile` | f_min, B_min | `protocol.f_min`, `protocol.B_min` (or `*_percentile`) |
 | f_ref | `utility.f_ref` (0 = 75th percentile of f) | Delta tau_cap | `utility.dtau_cap` |
-| w = (comp, comm, data, fair, strag) | `utility.weights.*` (> 0, sum 1) | w_c, w_r | `utility.w_c`, `utility.w_r` |
+| w = (comp, comm, data, fair, adh) | `utility.weights.*` (> 0, sum 1) | w_c, w_r | `utility.w_c`, `utility.w_r` |
 | utility form | `utility.form` (multiplicative, additive) | epsilon | `utility.eps` |
 | alpha, gamma (Q) | `state.alpha`, `state.gamma` | beta, Q(0) | `state.beta`, `state.Q0` |
 | delta_dl (cap) | `closing.delta_dl` | grace g | `closing.grace` |
