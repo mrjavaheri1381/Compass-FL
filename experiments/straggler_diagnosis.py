@@ -65,7 +65,7 @@ def main(run_dir: str) -> None:
                 predicted = detail["raw_deadline"] - detail["t_ack"]
                 ratios[group].append((detail["t_last"] - detail["t_ack"]) / predicted)
             if first:
-                prior_ratio[kappa].append(devices.devices[node].f / priors[kappa]["f"])
+                prior_ratio[kappa].append(devices.devices[node].f / priors.get(kappa, priors[0])["f"])
             if not straggler:
                 continue
             if devices.dropout(node, t) or detail.get("t_ack") is None:

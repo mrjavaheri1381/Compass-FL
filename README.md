@@ -238,8 +238,9 @@ snapshot and forwarded to A(t+1) if the handover already happened. The `plexus` 
 | R_s, I_max | `solver.R_s`, `solver.I_max` | solver | `solver.name` |
 | selector | `protocol.selector` | hash seed (round / model hash) | `protocol.pool_seed` |
 | HE mode, DP noise | `he.mode`, `he.dp.enabled`, `he.dp.sigma` | CKKS parameters | `he.ckks.*` |
-| kappa, f_bar, B_bar, sigma_bar | `env.devices.*` (classes from FedScale) | data partition, alpha | `data.partition`, `data.alpha` |
-| model | `model.architecture` | seed | `seed` |
+| f_bar, B_bar, sigma_bar (public priors) | `env.devices.*`, `protocol.declared_class` | D_max | `protocol.D_max`, `protocol.D_max_quantile` |
+| data partition, alpha | `data.partition`, `data.alpha` | model | `model.architecture` |
+| seed | `seed` | | |
 
 ### Modelling assumptions and simplifications (report with the results)
 

@@ -15,7 +15,7 @@ in English.
   `env/` (devices from FedScale, WonderNetwork latencies, fair-sharing network, `world.py`), `community.py` (the node
   protocol), `closing.py`, `selectors.py`, `he.py`, `config.py`, `data.py`, `runlog.py`.
 - `simulations/compass/`: `runner.py` and `plexus_shared.py` (the original Plexus logic on the shared environment).
-- `run.py` + `configs/*.yaml` is the only entry point. `tests/` has 129 pytest tests (about 3 minutes).
+- `run.py` + `configs/*.yaml` is the only entry point. `tests/` has 134 pytest tests (about 3 minutes).
 - The original Plexus code (`dlsim/plexus`, `simulations/plexus`, ...) is kept unchanged as the baseline reference.
 
 ## Commands
@@ -41,13 +41,8 @@ Phase 1 (audit) and Phase 2 (implementation) are done: every checklist item is i
 
 ## Open items before the paper's experiments (waiting for the author)
 
-1. **Missing acknowledgement stretches the round.** Per the paper, a client that never acknowledges the download is a
-   straggler only at dispatch + δ_dl, so a single dropout makes the round last δ_dl (seen: a 600 s round at N=100).
-   Proposed: a separate acknowledgement timeout (a multiple of the predicted download time), configurable. Needs the
-   author's decision, since it changes the paper's text.
-2. **Calibration of first-time participants.** About 35% of first-time participants become stragglers, against 16% for
-   repeat clients, because their deadlines rest only on class priors (FedScale classes are wide). Choose
-   `env.devices.sigma_rel`, `closing.z` and the number of classes with a short calibration run.
+1. **Straggler calibration: done** (AUDIT 7.4): class_rmse sigma prior and the acknowledgement deadline.
+2. **Self-declared values: done** (AUDIT 7.5): no declared device class (one public prior), declared D capped at D_max.
 3. **Open defaults.**
    - `protocol.forbid_repeat_aggregator`: A(t) selecting itself and then crashing is a single point of failure (AUDIT 7.1, I-2).
    - The Plexus baseline's `aggregation_timeout`: the original code stalls under realistic timings (I-4).

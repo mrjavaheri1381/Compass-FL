@@ -224,8 +224,21 @@ class CompassNode:
                 state.timer.cancel()
         self.event("offline", self.current[0], reason=reason)
 
+    @property
+    def declared_kappa(self) -> int:
+        """
+        The device class this node announces; without declared classes it announces nothing (one public prior, 0).
+        """
+        return self.kappa if self.cfg.protocol.declared_class else 0
+
+    def cap_D(self, D: float) -> float:
+        """
+        Declared dataset sizes cannot be verified, so every receiver caps them at the public D_max.
+        """
+        return min(float(D), self.world.D_max)
+
     def add_member(self, pk: bytes, kappa: int, D: float) -> None:
-        self.membership[pk] = (kappa, D)
+        self.membership[pk] = (kappa, self.cap_D(D))
 
     def drop_member(self, pk: bytes) -> None:
         self.membership.pop(pk, None)
@@ -382,7 +395,7 @@ class CompassNode:
             if pk in policy.tracks and update["base"] == base:
                 policy.on_ack(pk, self.now())
                 policy.on_arrival(pk, self.now(), self.now(), 0.0)
-                state.models[pk], state.sizes[pk], state.losses[pk] = update["theta"], update["D"], update["loss"]
+                state.models[pk], state.sizes[pk], state.losses[pk] = update["theta"], self.cap_D(update["D"]), update["loss"]
                 self.event("backup_update_used", round, client=self.short(pk))
         for pk in clients:
             self.send(pk, "dispatch", round, {"attempt": attempt, "theta": theta_prev, "backups": backups},
@@ -442,11 +455,11 @@ class CompassNode:
         state.losses[msg.src] = msg.payload["loss"]
         if status == "accepted":
             state.models[msg.src] = msg.payload["theta"]
-            state.sizes[msg.src] = msg.payload["D"]
+            state.sizes[msg.src] = self.cap_D(msg.payload["D"])
             self.check_closed(state)
         elif status == "late":
             if self.cfg.closing.late_merge.enabled:
-                state.late_updates.append((msg.src, msg.payload["theta"], msg.payload["D"]))
+                state.late_updates.append((msg.src, msg.payload["theta"], self.cap_D(msg.payload["D"])))
             if state.policy.closed:
                 self.finalize_client(state, msg.src)
             else:

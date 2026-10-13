@@ -563,3 +563,27 @@ New defaults, compared in `experiments/results/straggler_fixes` (N=100, 60 round
 - `closing.ack_factor = 3`, `ack_margin = 10 s`: a client without an acknowledgement by dispatch + 3 x predicted
   download time + 10 s is a straggler (lateness inf). Paper change: the "no acknowledgement within delta_dl" rule.
 - Five classes did not help and are not used (3 classes stay the default).
+
+### 7.5 No self-declared capacity; capped dataset size (2026-10-13, approved by the author)
+
+Nodes no longer declare a device class. Capacity, bandwidth, sigma, staleness and reliability all come from
+measurements; before its first measurement every node starts from one public prior (median f and B_up of the whole
+device trace, sigma_bar from the class_rmse rule computed over all devices). A lie about the class could only last one
+participation anyway (beta_i = 1 at m = 0), but removing the declaration removes a trust assumption from the paper.
+The only remaining declared value is the dataset size, which cannot be measured (the compute time depends on D/f). Every
+receiver caps it at a public D_max (default: the 95th percentile of the dataset sizes; 5 of 100 nodes are capped at
+alpha = 0.3, losing 2.6% of the total weight), and the capped value is used everywhere: FedAvg weights, mu, f_hat.
+
+- `protocol.declared_class = false` (true restores per-class priors), `protocol.D_max = 0` (absolute cap; 0 = derived),
+  `protocol.D_max_quantile = 0.95` (>= 1 disables the cap).
+- Cost, same setup as 7.4 (N=100, 60 rounds, 2 seeds, no SGD):
+
+| variant | stragglers | first-time | repeat | mean round | p90 round | updates/round | time for 60 rounds |
+|---|---|---|---|---|---|---|---|
+| declared classes (7.4 default) | 7.5% | 10.0% | 7.1% | 55 s | 87 s | 9.25 | 3371 s |
+| **public prior + D_max (new default)** | **7.8%** | **9.0%** | **7.6%** | **58 s** | 123 s | **9.22** | **3536 s** |
+
+- Paper changes: system model (D_i is the capped declared size, nothing else is declared), notation table (public
+  priors f_bar, B_bar, sigma_bar; D_max), initialization paragraph, the sigma_bar equation (over all devices), the
+  population-view paragraph, the security discussion and the limitations.
+

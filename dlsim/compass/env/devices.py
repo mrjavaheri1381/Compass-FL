@@ -120,9 +120,12 @@ class DeviceModel:
 
     # ------------------------------------------------------------------ priors
 
-    def priors(self, E: int, D: Dict[int, float], Z: float) -> Dict[int, ClassPrior]:
+    def priors(self, E: int, D: Dict[int, float], Z: float, declared: bool = True,
+               D_max: float = math.inf) -> Dict[int, ClassPrior]:
         """
-        Public class priors: median f and B_up of the class. sigma_bar_k is either
+        Public class priors: median f and B_up of the class. Without declared classes (``declared=False``) there is a
+        single prior, key 0, pooled over all devices. The protocol predicts with the capped size min(D, D_max), the
+        devices run on their true D. sigma_bar_k is either
         - ``rel``:        sigma_rel x the class mean of mu, or
         - ``class_rmse``: the root-mean-square error of the prior prediction inside the class,
                           sqrt(mean_i (mu_i(true f_i, B_i) - mu_i(f_bar, B_bar))^2), combined with the per-round
@@ -130,23 +133,27 @@ class DeviceModel:
                           been measured yet. Wide classes thus get wide margins.
         """
         out = {}
-        for kappa in range(self.config.num_classes):
-            members = [d for d in self.devices if d.kappa == kappa]
+        groups = range(self.config.num_classes) if declared else [None]
+        for kappa in groups:
+            members = [d for d in self.devices if kappa is None or d.kappa == kappa]
             if not members:
                 continue
             f_med = float(np.median([d.f for d in members]))
             b_med = float(np.median([d.B_up for d in members]))
-            mus = np.array([predict_completion(E, D[d.index], self.c, Z, f_med, b_med) for d in members])
+            mus = np.array([predict_completion(E, min(D[d.index], D_max), self.c, Z, f_med, b_med)
+                            for d in members])
             if self.config.sigma_prior == "class_rmse":
                 true_mus = np.array([predict_completion(E, D[d.index], self.c, Z, d.f, d.B_up) for d in members])
                 rmse = float(np.sqrt(np.mean((true_mus - mus) ** 2)))
-                fluctuation = self.config.fluct_cv[kappa] * float(np.mean(true_mus))
+                cv = float(np.sqrt(np.mean([self.config.fluct_cv[d.kappa] ** 2 for d in members])))
+                fluctuation = cv * float(np.mean(true_mus))
                 sigma = float(np.sqrt(rmse ** 2 + fluctuation ** 2))
             else:
                 sigma = self.config.sigma_rel * float(np.mean(mus))
-            out[kappa] = ClassPrior(f_med, b_med, sigma)
+            out[0 if kappa is None else kappa] = ClassPrior(f_med, b_med, sigma)
         self.stats["priors"] = {k: {"f": p.f, "B": p.B, "sigma": p.sigma} for k, p in out.items()}
         self.stats["sigma_prior"] = self.config.sigma_prior
+        self.stats["declared_class"] = declared
         return out
 
     # ------------------------------------------------------------------ per-round truth

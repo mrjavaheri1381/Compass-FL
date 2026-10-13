@@ -148,3 +148,25 @@ def test_wondernetwork_and_fedscale_models():
     assert devices.true_f(3, 7) == again.true_f(3, 7)
     priors = devices.priors(E=1, D={i: 500 for i in range(30)}, Z=1e6)
     assert priors[0].f <= priors[2].f
+
+
+def test_public_prior_without_declared_classes():
+    """Without declared classes there is one prior (key 0) pooled over all devices, wider than any class prior."""
+    config = load_config(overrides=["network.N=60"])
+    devices = DeviceModel(config.env.devices, 60, seed=1)
+    D = {i: 500 for i in range(60)}
+    per_class = devices.priors(E=1, D=D, Z=1e6, declared=True)
+    public = devices.priors(E=1, D=D, Z=1e6, declared=False)
+    assert set(per_class) == {0, 1, 2} and set(public) == {0}
+    assert per_class[0].f <= public[0].f <= per_class[2].f
+    assert public[0].sigma > max(p.sigma for p in per_class.values()) * 0.5
+
+
+def test_dataset_size_cap_in_priors():
+    """The protocol predicts with min(D, D_max): a cap below every D shortens the prior prediction."""
+    config = load_config(overrides=["network.N=30", "env.devices.sigma_prior=rel"])
+    devices = DeviceModel(config.env.devices, 30, seed=1)
+    D = {i: 1000 for i in range(30)}
+    uncapped = devices.priors(E=1, D=D, Z=1.0, declared=False)
+    capped = devices.priors(E=1, D=D, Z=1.0, declared=False, D_max=100)
+    assert capped[0].sigma == pytest.approx(uncapped[0].sigma / 10, rel=1e-3)

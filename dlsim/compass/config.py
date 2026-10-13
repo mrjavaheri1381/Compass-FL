@@ -172,6 +172,9 @@ class ProtocolConfig:
     B_min: float = -1.0
     B_min_percentile: float = 20.0
     aggregator_trains: bool = False   # The paper's aggregator does not train
+    declared_class: bool = False      # True: nodes declare a device class and get its prior; False: one public prior
+    D_max: float = 0.0                # Cap on the declared dataset size; 0 = D_max_quantile of the dataset sizes
+    D_max_quantile: float = 0.95      # Used when D_max = 0; >= 1 disables the cap
     forbid_repeat_aggregator: bool = False
     forbid_aggregator_as_client: bool = False
     verify_tol: float = 1e-9          # Absolute tolerance of the verifier on U
@@ -558,6 +561,8 @@ def validate(config: CompassConfig) -> None:
         raise ConfigError("utility.eps must be in (0, 1)")
     if u.dtau_cap <= 0:
         raise ConfigError("utility.dtau_cap must be > 0")
+    if p.D_max < 0 or p.D_max_quantile <= 0:
+        raise ConfigError("protocol.D_max must be >= 0 and protocol.D_max_quantile > 0")
     if p.selector not in SELECTORS:
         raise ConfigError("protocol.selector must be one of %s" % (SELECTORS,))
     if config.solver.name not in available_solvers():

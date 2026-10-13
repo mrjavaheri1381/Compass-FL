@@ -57,6 +57,9 @@ protocol:
   B_min: -1
   B_min_percentile: 20.0
   aggregator_trains: false
+  declared_class: false        # false: no self-declared device class, one public prior for every node
+  D_max: 0.0                   # cap on the declared dataset size D; 0 = D_max_quantile of the dataset sizes
+  D_max_quantile: 0.95         # >= 1 disables the cap
   verify_tol: 1.0e-9
   sim_tol: 1.0e-3              # CKKS tolerance on |S_ij - S_ji|
   probing:

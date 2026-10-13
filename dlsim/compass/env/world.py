@@ -75,12 +75,18 @@ class World:
         self.Z = float(len(self.theta0))
         self.y_hat = [normalize(n.label_counts) for n in self.data.nodes]
         D = {i: n.size for i, n in enumerate(self.data.nodes)}
-        self.priors = self.devices.priors(config.train.epochs, D, self.Z)
+        p = config.protocol
+        if p.D_max > 0:
+            self.D_max = p.D_max
+        elif p.D_max_quantile < 1:
+            self.D_max = float(np.quantile(list(D.values()), p.D_max_quantile))
+        else:
+            self.D_max = math.inf
+        self.priors = self.devices.priors(config.train.epochs, D, self.Z, p.declared_class, self.D_max)
 
         # Network-wide constants
         base_f = np.array([d.f for d in self.devices.devices])
         base_b = np.array([d.B_up for d in self.devices.devices])
-        p = config.protocol
         self.L_max = p.L_max if p.L_max > 0 else self.latency.percentile(p.L_max_percentile)
         self.f_min = p.f_min if p.f_min >= 0 else float(np.percentile(base_f, p.f_min_percentile))
         self.B_min = p.B_min if p.B_min >= 0 else float(np.percentile(base_b, p.B_min_percentile))
@@ -286,11 +292,11 @@ class World:
         node.go_online()
         members = [other for other in self.nodes if other.online and other is not node]
         for other in members:
-            node.add_member(other.pk, other.kappa, other.D)
-        node.add_member(node.pk, node.kappa, node.D)
+            node.add_member(other.pk, other.declared_kappa, other.D)
+        node.add_member(node.pk, node.declared_kappa, node.D)
         self.log_membership("rejoin" if rejoin else "join", node.pk, 0)
         for other in members:
-            node.send(other.pk, "join", 0, {"kappa": node.kappa, "D": node.D}, SMALL, "membership")
+            node.send(other.pk, "join", 0, {"kappa": node.declared_kappa, "D": node.D}, SMALL, "membership")
         await self.similarity_exchange(node, members, newcomer=True)
 
     async def similarity_exchange(self, node: CompassNode, members: List[CompassNode], newcomer: bool) -> None:
@@ -536,7 +542,7 @@ class World:
         for node in active:
             node.go_online()
             for other in active:
-                node.add_member(other.pk, other.kappa, other.D)
+                node.add_member(other.pk, other.declared_kappa, other.D)
             self.log_membership("initial", node.pk, 0)
         for node in active:
             await self.similarity_exchange(node, [o for o in active if o is not node], newcomer=False)
@@ -547,7 +553,7 @@ class World:
         self.apply_availability_traces()
         view = PopulationView(self.priors, cfg.state.Q0)
         for node in active:
-            view.add_node(node.pk, node.kappa, node.D, 0)
+            view.add_node(node.pk, node.declared_kappa, node.cap_D(node.D), 0)
         members = view.members()
         seed = 1 if cfg.protocol.pool_seed == "round" else hashing.model_seed(self.theta0)
         bootstrap_pk = hashing.pool(members, seed, cfg.protocol.M)[0]

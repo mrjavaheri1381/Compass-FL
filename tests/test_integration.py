@@ -49,7 +49,9 @@ def test_determinism(tmp_path):
 
 def test_next_ranked_proposal_when_next_aggregator_fails(tmp_path):
     """Test 9a: the selected A(t+1) crashes on the handover -> A(t) hands over to the next-ranked proposal."""
-    d = run(tmp_path, "handover_fail", "env.failures.scripted=[{round: 2, target: aggregator, when: handover}]")
+    # A(1) must hand over to another node, otherwise there is no handover message for the failure to hit
+    d = run(tmp_path, "handover_fail", "env.failures.scripted=[{round: 2, target: aggregator, when: handover}]",
+            "protocol.forbid_repeat_aggregator=true")
     events = read(d, "events")
     assert any(e["kind"] == "handover_no_ack" and e["round"] == 2 for e in events)
     round2 = [r for r in read(d, "rounds") if r["round"] == 2][0]
@@ -190,3 +192,11 @@ def test_availability_traces_option(tmp_path):
             "protocol.forbid_repeat_aggregator=true")
     kinds = [m["kind"] for m in read(d, "membership")]
     assert kinds.count("crash") >= 1 and "rejoin" in kinds
+
+
+def test_declared_classes_and_size_cap_options(tmp_path):
+    """The declared-class option and an aggressive dataset-size cap both run end to end."""
+    run_dir = run(tmp_path, "declared", "protocol.declared_class=true", "protocol.D_max=10")
+    meta = json.load(open(os.path.join(run_dir, "meta.json")))
+    assert meta["environment"]["devices"]["declared_class"] is True
+    assert len(read(run_dir, "rounds")) == 3
