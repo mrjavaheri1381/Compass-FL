@@ -276,7 +276,7 @@ class LNSConfig:
 @dataclass
 class SolverConfig:
     name: str = "greedy_swap"
-    R_s: int = 3
+    R_s: int = 10                     # seed pairs of greedy_swap (sensitivity: experiments/greedy_restarts.py)
     I_max: int = 50
     budget: BudgetConfig = field(default_factory=BudgetConfig)
     exact: ExactConfig = field(default_factory=ExactConfig)

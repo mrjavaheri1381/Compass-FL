@@ -30,7 +30,7 @@ def local_search(problem: SelectionProblem, state: IncrementalState, counter: Co
 @register("greedy_swap")
 class GreedySwapSolver(Solver):
 
-    def __init__(self, R_s: int = 3, I_max: int = 50, **options) -> None:
+    def __init__(self, R_s: int = 10, I_max: int = 50, **options) -> None:
         super().__init__(**options)
         self.R_s = R_s
         self.I_max = I_max

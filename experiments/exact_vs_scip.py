@@ -215,6 +215,7 @@ def _parse_so():
     for name, kwargs in [("--N", dict(type=int, default=1000)), ("--M", dict(type=int, default=50)),
                          ("--n", dict(type=int, default=10)), ("--rounds", dict(type=int, default=10)),
                          ("--seed", dict(type=int, default=42)), ("--driver", dict(default="greedy_swap")),
+                         ("--driver-rs", dict(type=int, default=3)),
                          ("--form", dict(default="multiplicative")),
                          ("--weights", dict(type=float, nargs=5, default=[0.2] * 5)),
                          ("--w-c", dict(type=float, default=0.5)), ("--w-r", dict(type=float, default=0.5)),

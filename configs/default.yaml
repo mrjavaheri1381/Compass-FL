@@ -85,7 +85,7 @@ closing:
   wait_grace_before_selection: false
 solver:
   name: greedy_swap            # greedy_swap | exact | tabu | simulated_annealing | genetic | lns | random
-  R_s: 3                       # R_s
+  R_s: 10                      # R_s
   I_max: 50                    # I_max
 he:
   mode: plaintext              # plaintext | ckks

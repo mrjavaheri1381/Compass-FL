@@ -91,6 +91,8 @@ def generate_instances(args, pop, params):
     tau = np.zeros(args.N)
     Q = np.ones(args.N)
     driver = create_solver(args.driver)
+    if args.driver == "greedy_swap":
+        driver.R_s = args.driver_rs  # The stored optima were produced with R_s = 3
     late_prob = np.array(args.late_prob)
     instances = []
     for t in range(1, args.rounds + 1):
@@ -261,6 +263,7 @@ def main():
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--solvers", nargs="+", default=HEURISTICS + ["exact"])
     parser.add_argument("--driver", default="greedy_swap", help="solver whose choices drive tau and Q")
+    parser.add_argument("--driver-rs", type=int, default=3, help="R_s of the greedy_swap driver (instances)")
     parser.add_argument("--exact-time", type=float, default=600.0, help="time limit of exact per round (s)")
     parser.add_argument("--form", default="multiplicative")
     parser.add_argument("--weights", type=float, nargs=5, default=[0.2] * 5, metavar=("COMP", "COMM", "DATA",
