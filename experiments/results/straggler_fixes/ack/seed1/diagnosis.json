@@ -1,0 +1,19 @@
+{
+ "rounds": 60,
+ "slots": 600,
+ "straggler_pct": 17.833333333333332,
+ "first_straggler_pct": 28.571428571428573,
+ "repeat_straggler_pct": 16.085271317829456,
+ "causes": {
+  "first": 24,
+  "fluctuation": 35,
+  "contention": 23,
+  "slowdown": 9,
+  "dropout": 16
+ },
+ "duration_mean": 46.534019027782165,
+ "duration_p90": 88.07090924196571,
+ "duration_max": 220.5952275372564,
+ "accepted_mean": 8.216666666666667,
+ "sim_time_total": 2847.59791823291
+}

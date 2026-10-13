@@ -540,3 +540,26 @@ old bypass community) and its edits to shared Plexus files (datasets' `label_cou
 COMPASS flags in `simulations/args.py`, the `learning_simulation.py` edits) were removed. This replaces decision Q14:
 there are no legacy wrappers any more, and `run.py` + YAML is the only entry point. `spma.py` moved to
 `dlsim/compass/solvers/spma.py`, where it is the engine of the `genetic` solver.
+
+### 7.4 Straggler calibration (2026-10-13, approved by the author)
+
+Diagnosis (`experiments/straggler_diagnosis.py`): first-time participants were the main source of stragglers (28–31%
+against 8–12% for repeat clients), because the class priors are wide (true f / prior of a class spans 0.4–4.9x in the
+FedScale sample) while sigma_bar was a fixed 0.2 x mean mu. Separately, every silent client (dropout) stretched its
+round to delta_dl, because the paper declares a missing acknowledgement only at dispatch + delta_dl.
+
+New defaults, compared in `experiments/results/straggler_fixes` (N=100, 60 rounds, 2 seeds, no SGD):
+
+| variant | stragglers | first-time | repeat | mean round | p90 round | updates/round | time for 60 rounds |
+|---|---|---|---|---|---|---|---|
+| previous defaults | 14.5% | 30.6% | 12.0% | 117 s | 600 s | 8.55 | 7099 s |
+| sigma_prior = class_rmse | 8.0% | 10.9% | 7.6% | 136 s | 600 s | 9.20 | 8208 s |
+| 5 device classes | 14.8% | 35.9% | 11.6% | 124 s | 600 s | 8.52 | 7474 s |
+| ack_factor = 3 | 15.1% | 27.2% | 13.1% | 45 s | 74 s | 8.49 | 2771 s |
+| **class_rmse + ack (new default)** | **7.5%** | **10.0%** | **7.1%** | **55 s** | **87 s** | **9.25** | **3371 s** |
+
+- `env.devices.sigma_prior = class_rmse`: sigma_bar_k = sqrt(RMSE of the prior prediction of mu inside class k^2 +
+  (CV_k x mean mu)^2). Paper change: the definition of the nominal sigma_bar_k.
+- `closing.ack_factor = 3`, `ack_margin = 10 s`: a client without an acknowledgement by dispatch + 3 x predicted
+  download time + 10 s is a straggler (lateness inf). Paper change: the "no acknowledgement within delta_dl" rule.
+- Five classes did not help and are not used (3 classes stay the default).

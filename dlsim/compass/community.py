@@ -367,7 +367,10 @@ class CompassNode:
                                delta_dl=cfg.closing.delta_dl, grace=cfg.closing.grace, rho=cfg.closing.rho,
                                contention_aware=cfg.closing.contention_aware,
                                B_down_aggregator=self.world.nominal_download(self.index),
-                               n_target=cfg.protocol.n)
+                               n_target=cfg.protocol.n, ack_factor=cfg.closing.ack_factor,
+                               ack_margin=cfg.closing.ack_margin,
+                               B_up_aggregator=self.world.nominal_upload(self.index),
+                               down_up_ratio=cfg.env.devices.down_up_ratio)
         policy = make_policy(cfg.closing.policy, infos, self.now(), params)
         state = RoundState(round, attempt, list(clients), policy, theta_prev, predecessor, self.now(),
                            closed=self.loop.create_future(), late_updates=list(late_updates))

@@ -122,7 +122,12 @@ class DeviceModel:
 
     def priors(self, E: int, D: Dict[int, float], Z: float) -> Dict[int, ClassPrior]:
         """
-        Public class priors: median f and B_up of the class; sigma_bar = sigma_rel x class mean of mu.
+        Public class priors: median f and B_up of the class. sigma_bar_k is either
+        - ``rel``:        sigma_rel x the class mean of mu, or
+        - ``class_rmse``: the root-mean-square error of the prior prediction inside the class,
+                          sqrt(mean_i (mu_i(true f_i, B_i) - mu_i(f_bar, B_bar))^2), combined with the per-round
+                          fluctuation of the class (CV x mean mu), i.e. the actual uncertainty of a node that has not
+                          been measured yet. Wide classes thus get wide margins.
         """
         out = {}
         for kappa in range(self.config.num_classes):
@@ -131,9 +136,17 @@ class DeviceModel:
                 continue
             f_med = float(np.median([d.f for d in members]))
             b_med = float(np.median([d.B_up for d in members]))
-            mus = [predict_completion(E, D[d.index], self.c, Z, f_med, b_med) for d in members]
-            out[kappa] = ClassPrior(f_med, b_med, self.config.sigma_rel * float(np.mean(mus)))
+            mus = np.array([predict_completion(E, D[d.index], self.c, Z, f_med, b_med) for d in members])
+            if self.config.sigma_prior == "class_rmse":
+                true_mus = np.array([predict_completion(E, D[d.index], self.c, Z, d.f, d.B_up) for d in members])
+                rmse = float(np.sqrt(np.mean((true_mus - mus) ** 2)))
+                fluctuation = self.config.fluct_cv[kappa] * float(np.mean(true_mus))
+                sigma = float(np.sqrt(rmse ** 2 + fluctuation ** 2))
+            else:
+                sigma = self.config.sigma_rel * float(np.mean(mus))
+            out[kappa] = ClassPrior(f_med, b_med, sigma)
         self.stats["priors"] = {k: {"f": p.f, "B": p.B, "sigma": p.sigma} for k, p in out.items()}
+        self.stats["sigma_prior"] = self.config.sigma_prior
         return out
 
     # ------------------------------------------------------------------ per-round truth

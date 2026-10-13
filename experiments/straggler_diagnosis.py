@@ -98,6 +98,18 @@ def main(run_dir: str) -> None:
         if values:
             q = np.percentile(values, [10, 50, 90, 99])
             print("  %-7s p10 %.2f  median %.2f  p90 %.2f  p99 %.2f  (n=%d)" % (group, *q, len(values)))
+    durations = np.array([r["duration"] for r in rounds])
+    accepted = np.array([r["accepted"] for r in rounds])
+    print("\nRound duration: mean %.1fs, median %.1fs, p90 %.1fs, max %.1fs | aggregated updates per round: mean %.2f"
+          % (durations.mean(), np.median(durations), np.percentile(durations, 90), durations.max(), accepted.mean()))
+    summary = {"rounds": len(rounds), "slots": total, "straggler_pct": 100 * stragglers / max(1, total),
+               "first_straggler_pct": 100 * first_stats["first"][1] / max(1, first_stats["first"][0]),
+               "repeat_straggler_pct": 100 * first_stats["repeat"][1] / max(1, first_stats["repeat"][0]),
+               "causes": dict(causes), "duration_mean": float(durations.mean()),
+               "duration_p90": float(np.percentile(durations, 90)), "duration_max": float(durations.max()),
+               "accepted_mean": float(accepted.mean()), "sim_time_total": float(rounds[-1]["close_time"])}
+    with open(os.path.join(run_dir, "diagnosis.json"), "w") as handle:
+        json.dump(summary, handle, indent=1)
     print("\nTrue capacity / class prior, first-time clients (spread inside a class):")
     for kappa in sorted(prior_ratio):
         q = np.percentile(prior_ratio[kappa], [10, 50, 90])

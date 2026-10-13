@@ -201,6 +201,9 @@ class World:
             down = 1e15
         self.network.set_capacity(index, up, down)
 
+    def nominal_upload(self, index: int) -> float:
+        return self.devices.devices[index].B_up
+
     def nominal_download(self, index: int) -> float:
         if self.config.network.large_aggregator_downlink:
             return 1e15

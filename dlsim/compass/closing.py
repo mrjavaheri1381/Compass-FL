@@ -15,7 +15,8 @@ k_i is the number of acknowledged clients of the round whose predicted upload wi
 arrives. With ``contention_aware = False`` the upload term is Z / B_i (the paper's formula).
 
 Policies:
-- predictive:     a client is a straggler at d_i' (or at dispatch + delta_dl without an acknowledgement); the round
+- predictive:     a client is a straggler at d_i' (or, without an acknowledgement, at its acknowledgement deadline:
+                  dispatch + delta_dl in the paper, or earlier with closing.ack_factor > 0); the round
                   closes when every client delivered or is a straggler, and never later than dispatch + delta_dl.
 - wait_all:       wait for every client, capped at dispatch + delta_dl.
 - fixed_deadline: one deadline dispatch + delta_dl for everyone.
@@ -47,6 +48,7 @@ class ClientInfo:
 class ClientTrack:
     info: ClientInfo
     t_ack: Optional[float] = None
+    ack_deadline: float = math.inf         # No acknowledgement by then -> straggler
     deadline: Optional[float] = None       # d_i' (effective)
     raw_deadline: Optional[float] = None   # d_i
     k: int = 1
@@ -74,6 +76,10 @@ class ClosingParams:
     contention_aware: bool
     B_down_aggregator: float
     n_target: int                          # n (over_selection closes after n deliveries)
+    ack_factor: float = 0.0                # > 0 enables the acknowledgement deadline
+    ack_margin: float = 10.0
+    B_up_aggregator: float = 0.0           # The aggregator's own upload capacity (dispatch of n models)
+    down_up_ratio: float = 4.0             # Client download = ratio x estimated upload
 
 
 class RoundClosingPolicy:
@@ -86,6 +92,21 @@ class RoundClosingPolicy:
         self.tracks: Dict[Hashable, ClientTrack] = {c.node: ClientTrack(c) for c in clients}
         self.closed = False
         self.close_time: Optional[float] = None
+        for track in self.tracks.values():
+            track.ack_deadline = self._ack_deadline(track.info, len(clients))
+
+    def _ack_deadline(self, info: ClientInfo, num_clients: int) -> float:
+        """
+        dispatch + ack_factor x predicted download time + ack_margin (capped at dispatch + delta_dl). The download is
+        limited by the aggregator's upload shared by the round's clients, or by the client's download capacity
+        (down_up_ratio x its estimated upload B_i). With ack_factor = 0 the paper's rule applies (only at the cap).
+        """
+        p = self.params
+        if p.ack_factor <= 0:
+            return self.cap
+        shared = p.Z * num_clients / p.B_up_aggregator if p.B_up_aggregator > 0 else 0.0
+        own = p.Z / (p.down_up_ratio * info.B) if info.B > 0 else math.inf
+        return min(self.cap, self.dispatch + p.ack_factor * max(shared, own) + p.ack_margin)
 
     # ------------------------------------------------------------------ deadlines
 
@@ -166,7 +187,7 @@ class RoundClosingPolicy:
         self._maybe_close(now)
 
     def _is_straggler(self, track: ClientTrack, now: float) -> bool:
-        return False
+        return track.t_ack is None and now >= track.ack_deadline
 
     def _maybe_close(self, now: float) -> None:
         if self.closed:
@@ -189,6 +210,8 @@ class RoundClosingPolicy:
             return None
         times = [self.cap]
         times += self._pending_deadlines()
+        times += [t.ack_deadline for t in self.tracks.values()
+                  if t.status == "pending" and t.t_ack is None and t.ack_deadline < self.cap]
         return min(times)
 
     def _pending_deadlines(self) -> List[float]:
@@ -239,7 +262,7 @@ class PredictivePolicy(RoundClosingPolicy):
 
     def _is_straggler(self, track: ClientTrack, now: float) -> bool:
         if track.t_ack is None:
-            return now >= self.cap
+            return now >= track.ack_deadline
         return now >= track.deadline
 
     def _pending_deadlines(self) -> List[float]:

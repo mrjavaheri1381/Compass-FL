@@ -101,7 +101,8 @@ class DevicesConfig:
     num_classes: int = 3
     cut_points: List[float] = field(default_factory=lambda: [1 / 3, 2 / 3])  # Quantiles of the combined score
     down_up_ratio: float = 4.0        # Assumption: download = ratio * upload (FedScale has one bandwidth value)
-    sigma_rel: float = 0.2            # sigma_bar_k = sigma_rel * class mean of mu
+    sigma_prior: str = "class_rmse"   # class_rmse: error of the prior inside the class; rel: sigma_rel x class mean of mu
+    sigma_rel: float = 0.2            # sigma_bar_k = sigma_rel * class mean of mu (sigma_prior = rel)
     fluct_cv: List[float] = field(default_factory=lambda: [0.3, 0.2, 0.1])  # Per-round log-normal CV, per class
     slowdown_prob: float = 0.02       # Probability of a sudden slowdown of a node in a round
     slowdown_factor: List[float] = field(default_factory=lambda: [3.0, 5.0])  # Uniform range of the slowdown
@@ -226,6 +227,8 @@ class ClosingConfig:
     over_selection: float = 0.3       # o
     contention_aware: bool = True     # Upload term Z / min(B_i, B_down(a) / k_i)
     rho: float = 0.9                  # Censoring threshold on the aggregator's ingress utilization
+    ack_factor: float = 3.0           # > 0: no acknowledgement by dispatch + ack_factor x predicted download + ack_margin
+    ack_margin: float = 10.0          #       makes the client a straggler (0 = the paper's rule: only at delta_dl)
     wait_grace_before_selection: bool = False  # Option (a): wait for the grace period before selecting
     late_merge: LateMergeConfig = field(default_factory=LateMergeConfig)
 
@@ -581,6 +584,10 @@ def validate(config: CompassConfig) -> None:
     if config.he.mode not in ("plaintext", "ckks"):
         raise ConfigError("he.mode must be plaintext or ckks")
     d = config.env.devices
+    if d.sigma_prior not in ("rel", "class_rmse"):
+        raise ConfigError("env.devices.sigma_prior must be rel or class_rmse")
+    if c.ack_factor < 0 or c.ack_margin < 0:
+        raise ConfigError("closing.ack_factor and closing.ack_margin must be >= 0")
     if d.source not in ("fedscale", "uniform"):
         raise ConfigError("env.devices.source must be fedscale or uniform")
     if len(d.cut_points) != d.num_classes - 1 or sorted(d.cut_points) != list(d.cut_points):

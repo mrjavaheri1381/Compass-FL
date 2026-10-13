@@ -148,3 +148,35 @@ def test_fedavg_weighted_by_dataset_size_and_empty_keeps_model():
     kept = fedavg([], [], previous=previous)
     for a, b in zip(kept.parameters(), previous.parameters()):
         assert torch.equal(a, b)
+
+
+def test_ack_deadline_declares_silent_clients_early():
+    """closing.ack_factor > 0: a client that never acknowledges is a straggler long before delta_dl."""
+    p = params(delta_dl=500.0)
+    p.ack_factor, p.ack_margin, p.B_up_aggregator, p.down_up_ratio = 2.0, 5.0, 3e6, 4.0
+    policy = make_policy("predictive", CLIENTS, 0.0, p)
+    expected = 2.0 * max(Z * 3 / 3e6, Z / (4.0 * 1e6)) + 5.0   # 2 x 1 s + 5 s
+    assert policy.tracks[2].ack_deadline == pytest.approx(expected)
+    for node in (0, 1):                      # node 2 stays silent (dropout)
+        policy.on_ack(node, 1.0)
+    assert policy.next_event() == pytest.approx(expected)
+    policy.advance(expected)
+    assert policy.tracks[2].status == "straggler" and not policy.closed
+    for node in (0, 1):
+        policy.advance(1.0 + TRUE_DURATION)
+        policy.on_arrival(node, TRUE_DURATION, 1.0 + TRUE_DURATION, 0.1)
+    assert policy.closed and policy.close_time == pytest.approx(1.0 + TRUE_DURATION)  # not delta_dl = 500
+    assert math.isinf(policy.lateness(policy.tracks[2]))
+    assert make_policy("predictive", CLIENTS, 0.0, params(delta_dl=500.0)).tracks[2].ack_deadline == 500.0
+
+
+def test_class_rmse_prior_is_wider_for_spread_classes():
+    from dlsim.compass.config import load_config
+    from dlsim.compass.env.devices import DeviceModel
+    D = {i: 500 for i in range(60)}
+    rel = DeviceModel(load_config(overrides=["network.N=60", "env.devices.sigma_prior=rel"]).env.devices, 60,
+                      seed=1).priors(1, D, 1e6)
+    config = load_config(overrides=["network.N=60", "env.devices.sigma_prior=class_rmse"])
+    rmse = DeviceModel(config.env.devices, 60, seed=1).priors(1, D, 1e6)
+    assert set(rel) == set(rmse) and all(rmse[k].sigma > 0 for k in rmse)
+    assert any(abs(rmse[k].sigma - rel[k].sigma) > 1e-9 for k in rmse)

@@ -28,7 +28,8 @@ env:
     num_classes: 3             # device classes kappa (quantile tiers)
     cut_points: [0.3333333333, 0.6666666667]
     down_up_ratio: 4.0         # assumption: download = 4 x upload
-    sigma_rel: 0.2             # sigma_bar_k = 0.2 x class mean of mu
+    sigma_prior: class_rmse    # sigma_bar_k = RMS error of the class prior + per-round fluctuation (rel: sigma_rel x mean mu)
+    sigma_rel: 0.2             # used only with sigma_prior: rel
     fluct_cv: [0.3, 0.2, 0.1]  # per-round log-normal fluctuation of f and B, per class
     slowdown_prob: 0.02
     slowdown_factor: [3.0, 5.0]
@@ -82,6 +83,8 @@ closing:
   over_selection: 0.3          # o
   contention_aware: true
   rho: 0.9                     # censoring threshold
+  ack_factor: 3.0              # no acknowledgement by dispatch + 3 x predicted download + ack_margin -> straggler
+  ack_margin: 10.0             # (0 = the paper's rule: only at delta_dl)
   wait_grace_before_selection: false
 solver:
   name: greedy_swap            # greedy_swap | exact | tabu | simulated_annealing | genetic | lns | random
