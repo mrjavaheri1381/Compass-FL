@@ -1,0 +1,13 @@
+# Quick check: effect of the data weight on convergence. 100 rounds, CIFAR-10 with strong label skew (alpha = 0.1),
+# N = 100, 3 seeds. The other four weights share the rest equally.
+#   python experiments/sweep.py experiments/sweeps/quick_data_weight.yaml --jobs 9 train.device=cuda run.accuracy_device=cuda
+#   python experiments/aggregate.py runs/sweeps/quick_data_weight
+name: quick_data_weight
+config: configs/default.yaml
+common: [data.alpha=0.1, network.N=100, run.rounds=100, run.accuracy_interval=5]
+seeds: [1, 2, 3]
+reference: data0.2
+variants:
+  data0.05: [weights.data=0.05, weights.comp=0.2375, weights.comm=0.2375, weights.fair=0.2375, weights.adh=0.2375]
+  data0.2: []
+  data0.6: [weights.data=0.6, weights.comp=0.1, weights.comm=0.1, weights.fair=0.1, weights.adh=0.1]
