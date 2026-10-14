@@ -120,6 +120,7 @@ class World:
         self.proposal_stats: Dict[int, Dict] = defaultdict(lambda: {"evaluations": [], "solve_time": [],
                                                                      "neighborhood": []})
         self.completed_rounds = 0
+        self.compute_used = 0.0                             # Device-seconds spent training (RTA)
         self.last_aggregator: Optional[int] = None
         self.consecutive_aggregator = 0
         self.last_progress = 0.0
@@ -436,6 +437,8 @@ class World:
                                    "bytes": self.traffic[(state.round, cat)][1]}
                              for cat in ("ctx", "propose", "probe", "model", "handover", "control", "poc")}
         record["estimate_error"] = self.estimate_errors(node.view, state.clients)
+        record["compute_total"] = self.compute_used
+        record["bytes_total"] = sum(v[1] for v in self.totals.values())
         interval = self.config.run.accuracy_interval
         if interval and state.round % interval == 0:
             record["accuracy"], record["test_loss"] = self.evaluate(theta)
@@ -512,6 +515,7 @@ class World:
         for round in sorted(self.round_records):
             self._write_round(round)
         self.log.write("summary", {"time": self.now(), "completed_rounds": self.completed_rounds,
+                                   "compute_total": self.compute_used,
                                    "traffic_totals": {k: {"messages": v[0], "bytes": v[1]}
                                                       for k, v in sorted(self.totals.items())},
                                    "he_stats": self.he_stats()})

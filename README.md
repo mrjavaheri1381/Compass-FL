@@ -173,6 +173,19 @@ python scripts/plot_compass.py runs/compass/seed42 runs/plexus/seed42 --out plot
 python scripts/bench_ckks.py --K 10 62 100                   # CKKS cost, sizes and error vs K
 ```
 
+Paper experiments are sweeps (variants x seeds) described in `experiments/sweeps/*.yaml`:
+
+```bash
+python experiments/sweep.py experiments/sweeps/weights.yaml --jobs 32 train.device=cuda run.accuracy_device=cuda
+python experiments/aggregate.py runs/sweeps/weights           # mean ± 95% CI, TTA/CTA/RTA, table, heatmap, curves
+```
+
+`sweep.py` validates every run first, runs them in parallel (one process each, log in `<run dir>.log`), skips
+complete runs and restarts incomplete ones, so it can be re-launched after an interruption. `aggregate.py` writes
+`per_run.csv`, `summary.csv`, `table.md`, `heatmap.png` (change vs the reference variant) and accuracy against
+simulated time, communication volume and training compute (the three axes of the Plexus paper). Each round record
+carries the cumulative `bytes_total` and `compute_total` (device-seconds of training) for CTA and RTA.
+
 Overrides are dotted keys (`closing.policy=over_selection`, `env.latency.city_assignment=concentrated`, ...); short
 aliases exist for `solver`, `selector`, `weights.*`, `N`, `M`, `n`, `k_nb`, `rounds`, `policy`, `form`, `he`.
 Unknown keys and invalid values fail loudly. `run.py` fixes `PYTHONHASHSEED`, and one `seed` drives every random

@@ -15,7 +15,7 @@ in English.
   `env/` (devices from FedScale, WonderNetwork latencies, fair-sharing network, `world.py`), `community.py` (the node
   protocol), `closing.py`, `selectors.py`, `he.py`, `config.py`, `data.py`, `runlog.py`.
 - `simulations/compass/`: `runner.py` and `plexus_shared.py` (the original Plexus logic on the shared environment).
-- `run.py` + `configs/*.yaml` is the only entry point. `tests/` has 135 pytest tests (about 3 minutes).
+- `run.py` + `configs/*.yaml` is the only entry point. `tests/` has 141 pytest tests (about 5 minutes).
 - The original Plexus code (`dlsim/plexus`, `simulations/plexus`, ...) is kept unchanged as the baseline reference.
 
 ## Commands
@@ -49,8 +49,8 @@ Phase 1 (audit) and Phase 2 (implementation) are done: every checklist item is i
 4. **Experiment design.** The paper's Experiments section is empty. Agree on the datasets and α, N/n/M/k_nb,
    baselines, ablations, seeds and rounds; then write one config per experiment.
 5. **Missing tooling.**
-   - A sweep runner (configs × seeds in parallel, on the GPU server).
-   - Aggregation across seeds (mean ± CI, paper tables).
+   - Sweep runner and aggregation: done (`experiments/sweep.py`, `experiments/aggregate.py`, sweeps in
+     `experiments/sweeps/`: weights, cohesion, closing). Main-comparison and other sweeps still to be written.
    - An offline solver benchmark (greedy_swap vs genetic vs exact on small instances, as the paper claims). This needs
      problem instances to be dumped, which is not done yet.
 6. **Data.**

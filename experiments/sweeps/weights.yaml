@@ -1,0 +1,15 @@
+# E3: effect of the utility weights. One weight raised to 0.6, the others 0.1, against uniform weights.
+# CIFAR-10, Dirichlet alpha = 0.1, N = 100, fixed budget of 50 simulated hours (as Plexus), 3 seeds.
+#   python experiments/sweep.py experiments/sweeps/weights.yaml --jobs 32 train.device=cuda run.accuracy_device=cuda
+name: weights
+config: configs/default.yaml
+common: [data.alpha=0.1, network.N=100, run.rounds=0, run.max_sim_time=180000, run.accuracy_interval=10]
+seeds: [1, 2, 3]
+reference: uniform
+variants:
+  uniform: []
+  comp: [weights.comp=0.6, weights.comm=0.1, weights.data=0.1, weights.fair=0.1, weights.adh=0.1]
+  comm: [weights.comp=0.1, weights.comm=0.6, weights.data=0.1, weights.fair=0.1, weights.adh=0.1]
+  data: [weights.comp=0.1, weights.comm=0.1, weights.data=0.6, weights.fair=0.1, weights.adh=0.1]
+  fair: [weights.comp=0.1, weights.comm=0.1, weights.data=0.1, weights.fair=0.6, weights.adh=0.1]
+  adh: [weights.comp=0.1, weights.comm=0.1, weights.data=0.1, weights.fair=0.1, weights.adh=0.6]

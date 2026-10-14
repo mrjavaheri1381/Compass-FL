@@ -1,0 +1,13 @@
+# E8: round-closing policies (and the predictive margin z). CIFAR-10, alpha = 0.1, N = 100, 50 simulated hours.
+name: closing
+config: configs/default.yaml
+common: [data.alpha=0.1, network.N=100, run.rounds=0, run.max_sim_time=180000, run.accuracy_interval=10]
+seeds: [1, 2, 3]
+reference: predictive
+variants:
+  predictive: [closing.policy=predictive]
+  predictive_z1: [closing.policy=predictive, closing.z=1.0]
+  predictive_z4: [closing.policy=predictive, closing.z=4.0]
+  wait_all: [closing.policy=wait_all]
+  fixed_deadline: [closing.policy=fixed_deadline]
+  over_selection: [closing.policy=over_selection]

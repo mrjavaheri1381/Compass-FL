@@ -1,0 +1,15 @@
+# E4: cohesion vs representativeness inside Phi_data (w_c + w_r = 1), with a raised data weight so that the trade-off
+# is visible. CIFAR-10, alpha in {0.1, 0.5} via the alpha override (run the sweep once per alpha, different --out).
+#   python experiments/sweep.py experiments/sweeps/cohesion.yaml --jobs 32 --out runs/sweeps/alpha0.1 data.alpha=0.1
+name: cohesion
+config: configs/default.yaml
+common: [network.N=100, run.rounds=0, run.max_sim_time=180000, run.accuracy_interval=10,
+         weights.comp=0.15, weights.comm=0.15, weights.data=0.4, weights.fair=0.15, weights.adh=0.15]
+seeds: [1, 2, 3]
+reference: wc0.50
+variants:
+  wc0.00: [utility.w_c=0.0, utility.w_r=1.0]
+  wc0.25: [utility.w_c=0.25, utility.w_r=0.75]
+  wc0.50: [utility.w_c=0.5, utility.w_r=0.5]
+  wc0.75: [utility.w_c=0.75, utility.w_r=0.25]
+  wc1.00: [utility.w_c=1.0, utility.w_r=0.0]

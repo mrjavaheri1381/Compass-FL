@@ -92,6 +92,9 @@ class PlexusWorld:
         self.completed: Dict[int, Dict] = {}
         self.samples: Dict[int, List[int]] = {}
         self.stopped = False
+        self.compute_used = 0.0
+        self.bytes_total = 0
+        self.last_close = 0.0
         self.on_finish = None
         self.test_loader = None
 
@@ -177,7 +180,11 @@ class PlexusWorld:
             overlay.model_manager.model_trainer.is_training = True
             cfg = self.config
             f = self.devices.true_f(index, round)
-            await asyncio.sleep(cfg.train.epochs * self.data.nodes[index].size * cfg.train.cycles_per_sample / f)
+            start = self.now()
+            try:
+                await asyncio.sleep(cfg.train.epochs * self.data.nodes[index].size * cfg.train.cycles_per_sample / f)
+            finally:
+                self.compute_used += self.now() - start
             if not cfg.data.bypass_training:
                 generator = torch.Generator()
                 generator.manual_seed(rng_seed(self.seed, "train", index, round) % (2 ** 63))
@@ -197,6 +204,7 @@ class PlexusWorld:
         if not receiver.is_active:
             return False
         self.network.set_offline(dst, False)
+        self.bytes_total += len(data) + len(info)
         timing = await self.network.transfer(src, dst, len(data) + len(info), self.latency.one_way(src, dst))
         if timing.ok and receiver.is_active and not self.stopped:
             ensure_future(receiver.on_receive(TransferResult(sender.my_peer, info, data, 0)))
@@ -223,6 +231,10 @@ class PlexusWorld:
             return
         record["clients"] = self.samples.get(round)
         record["logged"] = True
+        record["duration"] = record["close_time"] - self.last_close
+        self.last_close = record["close_time"]
+        record["compute_total"] = self.compute_used
+        record["bytes_total"] = self.bytes_total
         self.last_progress = self.now()
         interval = self.config.run.accuracy_interval
         if interval and round % interval == 0 and not self.config.data.bypass_training:
@@ -231,8 +243,9 @@ class PlexusWorld:
             record["accuracy"], record["test_loss"] = evaluate_model(model, self.test_loader)
         self.log.write("rounds", {k: v for k, v in record.items() if k != "logged"})
         print("Round %d closed at t=%.2f by node %d (plexus)" % (round, record["close_time"], record["aggregator"]))
-        if self.config.run.rounds and len([r for r in self.completed.values() if r.get("logged")]) >= \
-                self.config.run.rounds:
+        logged = len([r for r in self.completed.values() if r.get("logged")])
+        max_time = self.config.run.max_sim_time
+        if (self.config.run.rounds and logged >= self.config.run.rounds) or (max_time and self.now() >= max_time):
             self.finish()
 
     def check_liveness(self) -> None:
@@ -248,6 +261,10 @@ class PlexusWorld:
         if self.stopped:
             return
         self.stopped = True
+        self.log.write("summary", {"time": self.now(),
+                                   "completed_rounds": len([r for r in self.completed.values() if r.get("logged")]),
+                                   "compute_total": self.compute_used,
+                                   "traffic_totals": {"all": {"bytes": self.bytes_total}}})
         self.log.flush()
         if self.on_finish:
             self.on_finish()

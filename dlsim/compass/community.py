@@ -294,7 +294,11 @@ class CompassNode:
         self.train_task = self.world.spawn(self.train(round, attempt, msg.src, msg.payload["theta"]))
 
     async def train(self, round: int, attempt: int, aggregator: bytes, theta: bytes) -> None:
-        await asyncio.sleep(self.world.compute_time(self.index, round))
+        start = self.now()
+        try:
+            await asyncio.sleep(self.world.compute_time(self.index, round))
+        finally:  # Interrupted training still used the device
+            self.world.compute_used += self.now() - start
         if not self.online or self.current != (round, attempt):
             return
         new_theta, loss = self.world.local_training(self.index, round, theta)
