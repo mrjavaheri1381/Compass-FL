@@ -1,0 +1,22 @@
+# E1: main comparison with the baselines on CIFAR-10 (N = 1000 and 50 simulated hours, as in the Plexus paper).
+# Run once per data setting, each into its own output directory:
+#   python experiments/sweep.py experiments/sweeps/main.yaml --jobs 32 --out runs/sweeps/cifar10_a0.1 data.alpha=0.1 train.device=cuda run.accuracy_device=cuda
+#   python experiments/sweep.py experiments/sweeps/main.yaml --jobs 32 --out runs/sweeps/cifar10_a0.5 data.alpha=0.5 ...
+#   python experiments/sweep.py experiments/sweeps/main.yaml --jobs 32 --out runs/sweeps/cifar10_iid data.partition=iid ...
+# The Plexus-family baselines use the success fraction of the Plexus paper (0.8): with 1.0 a single dropped client
+# holds the round until the timeout. plexus_paper also uses the paper's sample size s = 13.
+name: main
+config: configs/default.yaml
+common: [network.N=1000, run.rounds=0, run.max_sim_time=180000, run.accuracy_interval=10]
+seeds: [1, 2, 3, 4, 5]
+reference: compass
+variants:
+  compass: []
+  compass_random: [protocol.selector=compass_random]
+  plexus: [protocol.selector=plexus, baselines.plexus.success_fraction=0.8]
+  plexus_paper: [protocol.selector=plexus, baselines.plexus.success_fraction=0.8, protocol.n=13]
+  fl_server: [protocol.selector=fl_server, baselines.plexus.success_fraction=0.8]
+  power_of_choice: [protocol.selector=power_of_choice]
+  oort_like: [protocol.selector=oort_like]
+  fedcs: [protocol.selector=fedcs]
+  oracle_central: [protocol.selector=oracle_central]

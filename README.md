@@ -277,6 +277,15 @@ snapshot and forwarded to A(t+1) if the handover already happened. The `plexus` 
   (`baselines.power_of_choice.eval_fraction` of an epoch of compute). With `data.bypass_training`, losses are synthetic.
 - `oracle_central` solves the same objective over the whole membership with the true f, B, RTTs and similarities; only
   the selection step is free.
+- `fedcs` follows FedCS (Nishio & Yonetani, 2019): clients are added greedily by the smallest increase of the estimated
+  round time (parallel computation, uploads one after another) while the round fits `baselines.fedcs.t_round` (0 =
+  `t_round_factor` x the median predicted time of the pool), at most n' clients. Capacities and bandwidths come from the
+  view estimates instead of client reports.
+- `fl_server` is the FL reference of the Plexus paper (`--fix-aggregator` in the original code): the Plexus logic with
+  a fixed server, the node with the lowest median RTT, with unlimited bandwidth and no dropout.
+- The Plexus port applies the same per-round device dropout as the other selectors (`baselines.plexus.dropout`); the
+  original simulation has none. With `baselines.plexus.success_fraction = 1` a dropped client holds the round until
+  the aggregation timeout, so the sweeps use the paper's 0.8.
 - The aggregator does not train (`protocol.aggregator_trains` exists as an option).
 
 ## Reference

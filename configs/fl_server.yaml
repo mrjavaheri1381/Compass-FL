@@ -1,0 +1,5 @@
+base: default.yaml
+run:
+  name: fl_server
+protocol:
+  selector: fl_server

@@ -84,6 +84,14 @@ class PlexusWorld:
         for d in self.devices.devices:
             down = 1e15 if config.network.large_aggregator_downlink else d.B_down
             self.network.set_capacity(d.index, d.B_up, down)
+        # FL baseline (Plexus' --fix-aggregator): the node with the lowest median RTT to the others is a fixed server
+        # with unlimited bandwidth, never drops out, and aggregates every round
+        self.server: Optional[int] = None
+        if config.protocol.selector == "fl_server":
+            rtt = self.latency.rtt
+            medians = [float(np.median(np.delete(rtt[i], i))) for i in range(self.N)]
+            self.server = int(np.argmin(medians))
+            self.network.set_capacity(self.server, 1e15, 1e15)
         self.data = FederatedData(config, self.N, self.seed)
         self.model0 = build_model(config.data.dataset, config.model.architecture, self.data.num_classes, self.seed)
         self.nodes: List[IPv8] = []
@@ -148,7 +156,9 @@ class PlexusWorld:
             dfl=DFLSettings(sample_size=cfg.protocol.n, num_aggregators=pc.num_aggregators,
                             success_fraction=pc.success_fraction, ping_timeout=pc.ping_timeout,
                             inactivity_threshold=1000,
-                            aggregation_timeout=pc.aggregation_timeout or cfg.closing.delta_dl),
+                            aggregation_timeout=pc.aggregation_timeout or cfg.closing.delta_dl,
+                            fixed_aggregator=None if self.server is None
+                            else self.overlays[self.server].my_peer.public_key.key_to_bin()),
             model=cfg.model.architecture, is_simulation=True, bypass_training=True)
         bws = {o.my_peer.public_key.key_to_bin(): int(self.devices.devices[i].B_up) for i, o in enumerate(self.overlays)}
         for i, overlay in enumerate(self.overlays):
@@ -179,6 +189,9 @@ class PlexusWorld:
             round = overlay.train_sample_estimate
             overlay.model_manager.model_trainer.is_training = True
             cfg = self.config
+            if cfg.baselines.plexus.dropout and index != self.server and self.devices.dropout(index, round):
+                # Silent for this round, as a dropped-out client of the other selectors: it never delivers
+                await asyncio.get_event_loop().create_future()
             f = self.devices.true_f(index, round)
             start = self.now()
             try:
@@ -219,7 +232,8 @@ class PlexusWorld:
         index = self.index[overlay.my_peer.public_key.key_to_bin()]
         self.completed[model_round] = {"round": model_round, "aggregator": index, "close_time": self.now(),
                                        "contributors": sorted(self.index[pk] for pk in contributors),
-                                       "clients": self.samples.get(model_round), "selector": "plexus"}
+                                       "clients": self.samples.get(model_round),
+                                       "selector": self.config.protocol.selector}
 
     def plexus_sample(self, sample_index: int, participants: List[bytes]) -> None:
         if sample_index not in self.samples:
@@ -271,4 +285,5 @@ class PlexusWorld:
 
     def environment_stats(self) -> Dict:
         return {"devices": {k: v for k, v in self.devices.stats.items() if k != "fedscale_sampled_ids"},
-                "latency": self.latency.stats, "data": self.data.stats, "selector": "plexus"}
+                "latency": self.latency.stats, "data": self.data.stats, "selector": self.config.protocol.selector,
+                "fl_server": self.server}

@@ -1,0 +1,12 @@
+# E2: where does the gain come from? Selection {informed, random} x round closing {predictive, fixed deadline}.
+# CIFAR-10, alpha = 0.1, N = 1000, 50 simulated hours, 5 seeds.
+name: factorial
+config: configs/default.yaml
+common: [data.alpha=0.1, network.N=1000, run.rounds=0, run.max_sim_time=180000, run.accuracy_interval=10]
+seeds: [1, 2, 3, 4, 5]
+reference: compass_predictive
+variants:
+  compass_predictive: [closing.policy=predictive]
+  compass_fixed: [closing.policy=fixed_deadline]
+  random_predictive: [protocol.selector=compass_random, closing.policy=predictive]
+  random_fixed: [protocol.selector=compass_random, closing.policy=fixed_deadline]

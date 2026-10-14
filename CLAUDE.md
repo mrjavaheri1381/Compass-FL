@@ -15,7 +15,7 @@ in English.
   `env/` (devices from FedScale, WonderNetwork latencies, fair-sharing network, `world.py`), `community.py` (the node
   protocol), `closing.py`, `selectors.py`, `he.py`, `config.py`, `data.py`, `runlog.py`.
 - `simulations/compass/`: `runner.py` and `plexus_shared.py` (the original Plexus logic on the shared environment).
-- `run.py` + `configs/*.yaml` is the only entry point. `tests/` has 141 pytest tests (about 5 minutes).
+- `run.py` + `configs/*.yaml` is the only entry point. `tests/` has 144 pytest tests (about 5 minutes).
 - The original Plexus code (`dlsim/plexus`, `simulations/plexus`, ...) is kept unchanged as the baseline reference.
 
 ## Commands

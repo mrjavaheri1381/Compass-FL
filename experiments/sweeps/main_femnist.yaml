@@ -1,0 +1,18 @@
+# E1 on FEMNIST (natural LEAF split, N = 355 writers and 200 simulated hours, as in the Plexus paper).
+# Needs the LEAF data under ~/leaf/femnist/data/{train,test}.
+name: main_femnist
+config: configs/default.yaml
+common: [data.dataset=femnist, data.partition=natural, network.N=355, run.rounds=0, run.max_sim_time=720000,
+         run.accuracy_interval=10]
+seeds: [1, 2, 3, 4, 5]
+reference: compass
+variants:
+  compass: []
+  compass_random: [protocol.selector=compass_random]
+  plexus: [protocol.selector=plexus, baselines.plexus.success_fraction=0.8]
+  plexus_paper: [protocol.selector=plexus, baselines.plexus.success_fraction=0.8, protocol.n=13]
+  fl_server: [protocol.selector=fl_server, baselines.plexus.success_fraction=0.8]
+  power_of_choice: [protocol.selector=power_of_choice]
+  oort_like: [protocol.selector=oort_like]
+  fedcs: [protocol.selector=fedcs]
+  oracle_central: [protocol.selector=oracle_central]

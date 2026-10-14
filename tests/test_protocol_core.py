@@ -116,3 +116,14 @@ def test_hash_pool_and_resample_index():
     assert first == again and len(first) == 5
     assert hashing.pool(nodes, seed=7, M=5, k=1) != first
     assert hashing.pool(nodes, seed=8, M=5) != first
+
+
+def test_fedcs_schedule():
+    """Uploads are sequential: the second slow uploader no longer fits; the cap n is respected."""
+    from dlsim.compass.selectors import fedcs_schedule
+    compute = {b"a": 1.0, b"b": 1.0, b"c": 1.0, b"d": 5.0}
+    upload = {b"a": 1.0, b"b": 1.0, b"c": 4.0, b"d": 1.0}
+    # a, b: round time 3; adding c -> 7, adding d -> 6: d is next (6 <= 6.5), then c exceeds
+    assert fedcs_schedule(compute, upload, n=4, t_round=6.5) == [b"a", b"b", b"d"]
+    assert fedcs_schedule(compute, upload, n=2, t_round=100.0) == [b"a", b"b"]
+    assert fedcs_schedule(compute, upload, n=4, t_round=1.5) == []

@@ -172,7 +172,8 @@ class ProbingConfig:
 
 @dataclass
 class ProtocolConfig:
-    selector: str = "compass"         # compass, compass_random, plexus, power_of_choice, oort_like, oracle_central
+    selector: str = "compass"         # compass, compass_random, plexus, fl_server, power_of_choice, oort_like,
+                                      # fedcs, oracle_central
     n: int = 4                        # Clients per round
     M: int = 10                       # Pool size
     k_nb: int = 8                     # Neighborhood size
@@ -362,6 +363,13 @@ class PlexusConfig:
     success_fraction: float = 1.0
     aggregation_timeout: float = 0.0  # 0 = closing.delta_dl (the same cap the other selectors get)
     ping_timeout: float = 5.0
+    dropout: bool = True              # Apply the per-round device dropout of env.devices, as for the other selectors
+
+
+@dataclass
+class FedCSConfig:
+    t_round: float = 0.0              # Round deadline T_round in seconds; 0 = t_round_factor x median predicted time
+    t_round_factor: float = 2.0       # of the pool members (from the view estimates)
 
 
 @dataclass
@@ -370,6 +378,7 @@ class BaselinesConfig:
     oort: OortConfig = field(default_factory=OortConfig)
     oracle: OracleConfig = field(default_factory=OracleConfig)
     plexus: PlexusConfig = field(default_factory=PlexusConfig)
+    fedcs: FedCSConfig = field(default_factory=FedCSConfig)
 
 
 @dataclass
@@ -542,7 +551,9 @@ def config_from_dict(data: Dict) -> CompassConfig:
 
 # ---------------------------------------------------------------------- validation
 
-SELECTORS = ("compass", "compass_random", "plexus", "power_of_choice", "oort_like", "oracle_central")
+SELECTORS = ("compass", "compass_random", "plexus", "fl_server", "power_of_choice", "oort_like", "fedcs",
+             "oracle_central")
+PLEXUS_SELECTORS = ("plexus", "fl_server")  # Run by simulations/compass/plexus_shared.py
 POLICIES = ("predictive", "wait_all", "fixed_deadline", "over_selection")
 
 

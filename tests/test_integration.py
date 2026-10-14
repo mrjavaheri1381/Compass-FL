@@ -80,11 +80,21 @@ def test_resample_then_self_serve_without_proposals(tmp_path):
     assert rounds[0]["aggregator"] == first["selected_by"]
 
 
-@pytest.mark.parametrize("selector", ["compass_random", "power_of_choice", "oort_like", "oracle_central"])
+@pytest.mark.parametrize("selector", ["compass_random", "power_of_choice", "oort_like", "fedcs", "oracle_central"])
 def test_selectors_run(tmp_path, selector):
     d = run(tmp_path, selector, "selector=%s" % selector, "run.rounds=2")
     rounds = read(d, "rounds")
-    assert len(rounds) == 2 and all(len(r["clients"]) == 4 for r in rounds)
+    sizes = [len(r["clients"]) for r in rounds]
+    # FedCS selects at most n', fewer when the deadline binds
+    assert len(rounds) == 2 and (all(1 <= s <= 4 for s in sizes) if selector == "fedcs" else sizes == [4, 4])
+
+
+def test_fl_server_baseline(tmp_path):
+    """FL reference of the Plexus paper: one fixed server (lowest median RTT, unlimited bandwidth) aggregates."""
+    d = run(tmp_path, "fl", "selector=fl_server", "data.synthetic_train_size=6000", "run.rounds=3")
+    rounds = read(d, "rounds")
+    server = json.load(open(os.path.join(d, "meta.json")))["environment"]["fl_server"]
+    assert len(rounds) == 3 and all(r["aggregator"] == server and r["selector"] == "fl_server" for r in rounds)
 
 
 def test_plexus_port_runs(tmp_path):

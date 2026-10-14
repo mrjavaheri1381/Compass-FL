@@ -18,7 +18,7 @@ def run_simulation(config, run_dir: str) -> None:
     loop = DiscreteLoop()
     asyncio.set_event_loop(loop)
     try:
-        if config.protocol.selector == "plexus":
+        if config.protocol.selector in ("plexus", "fl_server"):
             from simulations.compass.plexus_shared import PlexusWorld
             world = PlexusWorld(config, run_dir)
         else:

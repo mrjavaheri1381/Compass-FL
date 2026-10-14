@@ -595,3 +595,14 @@ already penalized by Phi_comp. The term is therefore called deadline adherence. 
 (`weights.strag` in old YAML files, overrides and run logs is still accepted and renamed on load); the logged component
 is `adh`. Paper: Phi_adh, w_adh, "deadline-adherence score Q_i", label `eq:adherence_score`, and one sentence that
 contrasts Phi_adh with Phi_comp. "Straggler" still names a client that misses its deadline.
+
+### 7.7 Baselines for the paper (2026-10-14, agreed with the author)
+
+Main comparison (experiments/sweeps/main.yaml, main_femnist.yaml): compass, compass_random, plexus (n = 10, success
+fraction 0.8), plexus_paper (s = 13, 0.8), fl_server (new: the FL reference of the Plexus paper), power_of_choice,
+oort_like, fedcs (new: FedCS, Nishio & Yonetani 2019) and oracle_central. GL and D-PSGD are not ported: they are a
+different paradigm (every node trains every round) and the Plexus paper already compares them with Plexus.
+The Plexus port now applies the per-round device dropout of the shared environment (`baselines.plexus.dropout`,
+default true), which the original simulation lacks; without it Plexus would be compared under easier conditions.
+E2 (factorial.yaml): selection {informed, random} x closing {predictive, fixed deadline}.
+
