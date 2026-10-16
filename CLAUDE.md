@@ -54,7 +54,11 @@ Phase 1 (audit) and Phase 2 (implementation) are done: every checklist item is i
    - An offline solver benchmark (greedy_swap vs genetic vs exact on small instances, as the paper claims). This needs
      problem instances to be dumped, which is not done yet.
 6. **Data.**
-   - FEMNIST and Shakespeare are not downloaded (LEAF, under `~/leaf/<dataset>/data/{train,test}`).
+   - FEMNIST is installed on the laptop (LEAF niid, sf 0.1, seeds 1, 366 users with >= 20 train samples):
+     `~/leaf/femnist/data/{train,test}` (COMPASS-FL) and `~/leaf/femnist/per_user_data/train` (original Plexus code;
+     made with `scripts/leaf_per_user.py --min-samples 20`, because its trainer drops incomplete batches). LEAF needs
+     `Image.ANTIALIAS` -> `Image.LANCZOS` in `preprocess/data_to_json.py` with Pillow >= 10. Shakespeare is not
+     downloaded.
    - CIFAR-100 needs `data.download=true` (ask before downloading).
    - CIFAR-10 must be present in `~/dfl-data`.
 7. **Commits and remotes.** Commits go to `https://github.com/mrjavaheri1381/Compass-FL` (remote `mine` on the
