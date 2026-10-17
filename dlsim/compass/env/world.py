@@ -516,12 +516,24 @@ class World:
             self._write_round(round)
         self.log.write("summary", {"time": self.now(), "completed_rounds": self.completed_rounds,
                                    "compute_total": self.compute_used,
+                                   "held_state": self.held_state(),
                                    "traffic_totals": {k: {"messages": v[0], "bytes": v[1]}
                                                       for k, v in sorted(self.totals.items())},
                                    "he_stats": self.he_stats()})
         self.log.flush()
         if self.on_finish:
             self.on_finish()
+
+    def held_state(self) -> Dict:
+        """
+        Per-round state still held by the nodes at the end (a check that it does not grow with the run length).
+        """
+        return {"rounds": sum(len(n.rounds) for n in self.nodes),
+                "retained": sum(len(n.retained) for n in self.nodes),
+                "retained_views": sum(1 for n in self.nodes for r in n.retained.values() if r.view is not None),
+                "probe_cache": sum(len(n.probe_cache) for n in self.nodes),
+                "model_bytes_in_rounds": sum(len(m) for n in self.nodes for s in n.rounds.values()
+                                             for m in s.models.values())}
 
     def he_stats(self) -> Dict:
         totals = defaultdict(float)

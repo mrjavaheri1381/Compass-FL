@@ -172,7 +172,10 @@ def test_plexus_port_matches_original_participants(tmp_path):
                              "--accuracy-logging-interval", "0"], cwd=str(work), env=env, capture_output=True,
                             text=True, timeout=900)
     assert result.returncode == 0, result.stderr[-2000:]
-    out_dir = [os.path.join(str(work), "data", x) for x in os.listdir(str(work / "data")) if x.endswith("dfl")]
+    # Only this run's output (data/ is the repository's folder: never touch other runs' results)
+    out_dir = [os.path.join(str(work), "data", x) for x in os.listdir(str(work / "data"))
+               if x.startswith("n_16_cifar10_s4_") and x.endswith("sd42dfl")]
+    assert len(out_dir) == 1, out_dir
     short = {hexlify(node_public_key(i)).decode()[-8:]: i for i in range(16)}
     original = defaultdict(set)
     try:
@@ -210,3 +213,17 @@ def test_declared_classes_and_size_cap_options(tmp_path):
     meta = json.load(open(os.path.join(run_dir, "meta.json")))
     assert meta["environment"]["devices"]["declared_class"] is True
     assert len(read(run_dir, "rounds")) == 3
+
+
+def test_per_round_state_is_released(tmp_path):
+    """Round states, client models and retained views must not accumulate over the run (memory over long runs)."""
+    d = run(tmp_path, "held", "run.rounds=15")
+    held = read(d, "summary")[-1]["held_state"]
+    assert held["model_bytes_in_rounds"] == 0
+    assert held["rounds"] <= 3 and held["retained_views"] <= 2, held
+
+
+def test_late_merge_option_runs(tmp_path):
+    """The REFL-style late merge carries the previous round's late updates (4-tuples) without breaking selection."""
+    d = run(tmp_path, "late_merge", "closing.late_merge.enabled=true", "closing.z=0.5", "run.rounds=6")
+    assert len(read(d, "rounds")) == 6

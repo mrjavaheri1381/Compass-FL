@@ -606,3 +606,27 @@ The Plexus port now applies the per-round device dropout of the shared environme
 default true), which the original simulation lacks; without it Plexus would be compared under easier conditions.
 E2 (factorial.yaml): selection {informed, random} x closing {predictive, fixed deadline}.
 
+### 7.8 Code review before the experiments (2026-10-17)
+
+Fixed:
+- **Unbounded per-round state (memory).** Every aggregator kept its RoundState (all client models of the round and
+  theta^(t-1)) and, per handover, theta and the view, for the whole run: roughly 10 GB per run for the CIFAR-10 model
+  over 3000 rounds, far more for FEMNIST. Client models and theta^(t-1) are now released after aggregation, the round
+  state after its grace period, and a handover keeps only the successor's address once the successor reported its
+  round closed (the view is still kept until then, for the watchdog). Probe caches and client backup lists are pruned.
+  `summary.jsonl` reports `held_state`; a 60-round run gives results identical to before.
+- **Plexus port had no per-round bandwidth fluctuation or slowdowns** (the COMPASS world applies both). Each node's
+  bandwidth is now set per round when it trains or aggregates, as in the COMPASS world (the FL server keeps its
+  unlimited capacity). With the dropout fix of 7.7, both families now run in the same environment.
+- `closing.late_merge.enabled` crashed (unpacking the previous round's 4-tuples); only this round's late updates are
+  carried on now.
+- The Plexus equivalence test deleted every `data/*dfl` folder of the repository; it now touches only its own output.
+
+Noted, not changed:
+- The acknowledgement deadline (closing.ack_factor) also applies to wait_all, fixed_deadline and over_selection; this is
+  the same for every policy, so the comparison stays fair, but "fixed deadline" is not literally one deadline.
+- LNS rebuilds greedily and may re-add the members it removed, so it rarely leaves the greedy solution (a weak
+  baseline in the solver comparison).
+- A solve takes no simulated time (candidates solve in parallel in reality; about 0.05 s against rounds of ~60 s).
+- The flow-level network loops over all nodes on every event; correct, but a likely hot spot at N = 1000.
+

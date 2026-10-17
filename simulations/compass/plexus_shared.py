@@ -102,6 +102,7 @@ class PlexusWorld:
         self.stopped = False
         self.compute_used = 0.0
         self.bytes_total = 0
+        self.capacity_round: Dict[int, int] = {}
         self.last_close = 0.0
         self.on_finish = None
         self.test_loader = None
@@ -192,6 +193,7 @@ class PlexusWorld:
             if cfg.baselines.plexus.dropout and index != self.server and self.devices.dropout(index, round):
                 # Silent for this round, as a dropped-out client of the other selectors: it never delivers
                 await asyncio.get_event_loop().create_future()
+            self.set_round_capacity(index, round)
             f = self.devices.true_f(index, round)
             start = self.now()
             try:
@@ -208,6 +210,19 @@ class PlexusWorld:
             return self.data.nodes[index].size
         return train
 
+    def set_round_capacity(self, index: int, round: int) -> None:
+        """
+        The node's bandwidth for a round (per-round fluctuation and slowdowns), as the COMPASS-FL world sets it when a
+        node acts in a round. The FL server keeps its unlimited capacity.
+        """
+        if index == self.server or self.capacity_round.get(index) == round:
+            return
+        self.capacity_round[index] = round
+        up, down = self.devices.true_bandwidth(index, round)
+        if self.config.network.large_aggregator_downlink:
+            down = 1e15
+        self.network.set_capacity(index, up, down)
+
     # ------------------------------------------------------------------ transport
 
     async def transfer(self, sender, peer, info: bytes, data: bytes, round: int, type: str) -> bool:
@@ -217,6 +232,8 @@ class PlexusWorld:
         if not receiver.is_active:
             return False
         self.network.set_offline(dst, False)
+        if type == "aggregated_model" or src not in self.capacity_round:
+            self.set_round_capacity(src, round)  # An aggregator acting in this round
         self.bytes_total += len(data) + len(info)
         timing = await self.network.transfer(src, dst, len(data) + len(info), self.latency.one_way(src, dst))
         if timing.ok and receiver.is_active and not self.stopped:

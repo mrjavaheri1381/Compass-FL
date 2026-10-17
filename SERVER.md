@@ -8,7 +8,7 @@ were already met (and fixed) on the laptop. Project background is in `CLAUDE.md`
 ```bash
 git pull --recurse-submodules          # pyipv8 is a submodule; first time: git submodule update --init
 pip install -r requirements.txt        # torch must be the CUDA build on the server
-python -m pytest                       # 144 tests, ~5 min; must pass before any experiment
+python -m pytest                       # 146 tests, ~5 min; must pass before any experiment
 ```
 
 - The server runs Python 3.14. The original Plexus code needs an event loop set before it starts (see section 5);

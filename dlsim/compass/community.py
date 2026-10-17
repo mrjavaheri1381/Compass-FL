@@ -75,11 +75,12 @@ class RoundState:
 @dataclass
 class Retained:
     """
-    What A(t) keeps after handing round t+1 over (fault handling).
+    What A(t) keeps after handing round t+1 over (fault handling): the view, to take it back if the successor fails,
+    and the successor, to forward late records. Once the successor reports its round closed the view is released
+    (``view = None``) and only the most recent entry is kept.
     """
     round: int
-    theta: bytes
-    view: PopulationView
+    view: Optional[PopulationView]
     successor: bytes
     attempt: int
 
@@ -278,6 +279,8 @@ class CompassNode:
         round, attempt = msg.round, msg.payload["attempt"]
         if (round, attempt) <= self.current:
             return
+        for key in [key for key in self.backups if key[0] < round]:
+            del self.backups[key]
         if self.train_task is not None and not self.train_task.done():
             self.train_task.cancel()
             self.event("training_interrupted", self.current[0])
@@ -485,6 +488,9 @@ class CompassNode:
             models.append(self.world.model_from_bytes(theta))
             sizes.append(D * cfg.closing.late_merge.weight)
         theta = self.world.model_to_bytes(fedavg(models, sizes, previous))
+        # The client models and theta^(t-1) are no longer needed; holding them for every round grows without bound
+        state.models.clear()
+        state.theta_prev = b""
 
         self.view.mark_participated(state.clients, round)
         self.world.round_closed(self, state, theta)
@@ -519,9 +525,15 @@ class CompassNode:
         self.apply_or_forward(record)
 
     def finalize_remaining(self, state: RoundState) -> None:
+        """
+        At the end of the grace period: finalize every client and release the round (later arrivals are ignored, as
+        they would be after the grace period anyway).
+        """
         for pk in state.clients:
             if pk not in state.finalized:
                 self.finalize_client(state, pk)
+        if self.rounds.get(state.round) is state:
+            del self.rounds[state.round]
 
     def apply_record(self, view: PopulationView, record: StateRecord) -> str:
         cfg = self.cfg
@@ -540,7 +552,8 @@ class CompassNode:
             return
         retained = self.retained.get(record.round + 1)
         if retained is not None:
-            self.apply_record(retained.view, record)
+            if retained.view is not None:
+                self.apply_record(retained.view, record)
             self.send(retained.successor, "late_records", record.round, {"records": [record]}, SMALL + 64, "control")
             self.event("late_record_forwarded", record.round, client=self.short(record.node),
                        to=self.short(retained.successor))
@@ -555,8 +568,9 @@ class CompassNode:
             self.event("late_record_dropped", round, count=len(records))
             return
         latest = self.retained[max(self.retained)]
-        for record in records:
-            self.apply_record(latest.view, record)
+        if latest.view is not None:
+            for record in records:
+                self.apply_record(latest.view, record)
         self.send(latest.successor, "late_records", round, {"records": records}, SMALL + 64 * len(records), "control")
 
     def on_late_records(self, msg, timing):
@@ -600,7 +614,8 @@ class CompassNode:
     def collect_late_updates(self, state: Optional[RoundState]):
         if state is None or not self.cfg.closing.late_merge.enabled:
             return []
-        return [(pk, theta, D, state.round) for pk, theta, D in state.late_updates]
+        # Only this round's late updates (3-tuples); those inherited from the previous round were merged already
+        return [(u[0], u[1], u[2], state.round) for u in state.late_updates if len(u) == 3]
 
     async def handover_chain(self, next_round: int, theta: bytes, outcome: SelectionOutcome,
                              state: Optional[RoundState]) -> bool:
@@ -628,11 +643,16 @@ class CompassNode:
                 self.event("handover_no_ack", next_round, to=self.short(proposal.aggregator), rank=index)
                 continue
             self.world.selection_done(self, next_round, outcome, proposal, index)
-            self.retained[next_round] = Retained(next_round, theta, self.view, proposal.aggregator, attempt)
+            self.retained[next_round] = Retained(next_round, self.view, proposal.aggregator, attempt)
             self.view = None
             done = self.wait_key(("round_done", next_round, attempt))
             try:
                 await asyncio.wait_for(asyncio.shield(done), watchdog)
+                # The successor runs on its own copy now: keep only its address, for forwarding late records
+                for old in [r for r in self.retained if r < next_round]:
+                    del self.retained[old]
+                if next_round in self.retained:
+                    self.retained[next_round].view = None
                 return True
             except asyncio.TimeoutError:
                 if not self.online:
@@ -668,6 +688,8 @@ class CompassNode:
         P probes to every other pool member in parallel; L_ia = median RTT (inf if every probe is lost). Measurements
         are cached per (round, k), so prefetched probes are reused and only missing members are probed.
         """
+        for key in [key for key in self.probe_cache if key[0] < round - 1]:
+            del self.probe_cache[key]
         cache = self.probe_cache.setdefault((round, k), {})
         P = self.cfg.protocol.probing.P
         timeout = max(1.0, 4 * self.world.L_max)
