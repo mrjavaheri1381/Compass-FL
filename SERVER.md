@@ -8,7 +8,7 @@ were already met (and fixed) on the laptop. Project background is in `CLAUDE.md`
 ```bash
 git pull --recurse-submodules          # pyipv8 is a submodule; first time: git submodule update --init
 pip install -r requirements.txt        # torch must be the CUDA build on the server
-python -m pytest                       # 146 tests, ~5 min; must pass before any experiment
+python -m pytest                       # 147 tests, ~5 min; must pass before any experiment
 ```
 
 - The server runs Python 3.14. The original Plexus code needs an event loop set before it starts (see section 5);
@@ -110,6 +110,9 @@ Baselines (all on the same simulated environment): `compass`, `compass_random`, 
 logic), `plexus_paper` (s=13), `fl_server` (fixed server with unlimited bandwidth, as Plexus' `--fix-aggregator`),
 `power_of_choice`, `oort_like`, `fedcs`, `oracle_central`. Plexus-family variants use `success_fraction=0.8`; with 1.0
 one dropped client holds the round until the timeout.
+
+Interactive single runs: `python run_interactive.py` asks for the algorithm, dataset and parameters (or a saved
+preset from `configs/presets/`, e.g. `--preset compass_femnist_n14`), then shows the log and a progress bar.
 
 Single runs: `python run.py --config configs/default.yaml <key=value ...> --run-dir runs/<name>`;
 `--print-config` shows the resolved configuration.

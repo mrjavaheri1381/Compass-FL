@@ -4,7 +4,12 @@ default shown in brackets), checks the configuration, then runs it, streams the 
 on the last line: round x of y (or simulated time of the budget), status, and the latest / best test accuracy.
 
     python run_interactive.py
-    python run_interactive.py --defaults      # accept every default without asking (quick check)
+    python run_interactive.py --preset compass_femnist_n14   # run a saved preset (asks only rounds, seed, device)
+    python run_interactive.py --defaults                     # accept every default without asking (quick check)
+
+Presets: after the questions you can save the answers as configs/presets/<name>.yaml (a normal config file that
+inherits configs/default.yaml, so `run.py --config configs/presets/<name>.yaml` runs it too). At start the launcher
+lists the saved presets; the device is never stored in a preset, it is asked for each run.
 
 Everything is passed to run.py as ordinary overrides, so the printed command reproduces the run exactly. Outputs go to
 runs/interactive/<algorithm>_<dataset>_<time>/ (rounds.jsonl, summary.jsonl, ...); the full log is saved next to it
@@ -22,7 +27,11 @@ import sys
 import threading
 import time
 
+import yaml
+
 ROOT = os.path.dirname(os.path.abspath(__file__))
+PRESETS = os.path.join(ROOT, "configs", "presets")
+MACHINE_KEYS = ("train.device", "run.accuracy_device")  # Never stored in a preset
 HOME = os.path.expanduser("~")
 
 ALGORITHMS = [
@@ -209,14 +218,66 @@ def ask_everything(asker: Asker):
                                              lambda v: None if v >= 0 else "must be >= 0")
     o["train.epochs"] = asker.value("local epochs E", 1, int, positive)
     o["seed"] = asker.value("seed", 1, int)
-    device = "cuda" if cuda_available() else "cpu"
-    device = asker.value("device", device, str, lambda v: None if v in ("cpu", "cuda", "mps") else "cpu, cuda or mps")
-    o["train.device"] = o["run.accuracy_device"] = device
-    if asker.yes("skip real training (protocol only, much faster, no accuracy)", False):
+    ask_device(asker, o, "cuda" if cuda_available() else "cpu")
+    if not asker.yes("train the model for real (needed for accuracy; n = protocol only, much faster)", True):
         o["data.bypass_training"] = "true"
         o["run.accuracy_interval"] = 0
+        print("  note: no model is trained, so no accuracy is computed (timing, stragglers, selection only)")
     description = "%s on %s" % (algorithm, dataset)
     return o, description, rounds, budget
+
+
+def ask_device(asker: Asker, o, default: str) -> None:
+    device = asker.value("device", default, str, lambda v: None if v in ("cpu", "cuda", "mps") else "cpu, cuda or mps")
+    o["train.device"] = o["run.accuracy_device"] = device
+
+
+# ---------------------------------------------------------------------- presets
+
+def coerce(value):
+    return yaml.safe_load(value) if isinstance(value, str) else value
+
+
+def save_preset(name: str, overrides, description: str) -> str:
+    tree = {"base": "../default.yaml"}
+    for key, value in overrides.items():
+        if key in MACHINE_KEYS:
+            continue
+        node = tree
+        *parents, leaf = key.split(".")
+        for part in parents:
+            node = node.setdefault(part, {})
+        node[leaf] = coerce(value)
+    os.makedirs(PRESETS, exist_ok=True)
+    path = os.path.join(PRESETS, name + ".yaml")
+    with open(path, "w") as handle:
+        handle.write("# description: %s\n# Saved by run_interactive.py on %s. Run with:\n"
+                     "#   python run_interactive.py --preset %s     or     python run.py --config %s\n"
+                     % (description, time.strftime("%Y-%m-%d %H:%M"), name, os.path.relpath(path, ROOT)))
+        yaml.safe_dump(tree, handle, sort_keys=False)
+    return path
+
+
+def list_presets():
+    if not os.path.isdir(PRESETS):
+        return []
+    out = []
+    for name in sorted(f[:-5] for f in os.listdir(PRESETS) if f.endswith(".yaml")):
+        description = ""
+        with open(os.path.join(PRESETS, name + ".yaml")) as handle:
+            first = handle.readline()
+        if first.startswith("# description:"):
+            description = first[len("# description:"):].strip()
+        out.append((name, description))
+    return out
+
+
+def resolved(command):
+    """The fully resolved configuration of a command (also validates it)."""
+    check = subprocess.run(command + ["--print-config"], cwd=ROOT, capture_output=True, text=True)
+    if check.returncode != 0:
+        sys.exit("\nInvalid configuration:\n" + check.stderr[-2000:])
+    return yaml.safe_load(check.stdout)
 
 
 def cuda_available() -> bool:
@@ -250,6 +311,8 @@ class Progress:
             return min(1.0, self.sim_time / self.budget)
         return 0.0
 
+    accuracy_off = False
+
     def line(self) -> str:
         width = max(10, min(30, shutil.get_terminal_size((100, 20)).columns - 90))
         done = int(round(self.fraction() * width))
@@ -258,7 +321,10 @@ class Progress:
             where = "round %d/%d" % (self.round, self.rounds)
         else:
             where = "round %d, sim %.1f/%.0f h" % (self.round, self.sim_time / 3600, self.budget / 3600)
-        acc = "acc -" if self.acc is None else "acc %.2f%% (best %.2f%%)" % (100 * self.acc, 100 * self.best)
+        if self.accuracy_off:
+            acc = "acc off (no training)"
+        else:
+            acc = "acc -" if self.acc is None else "acc %.2f%% (best %.2f%%)" % (100 * self.acc, 100 * self.best)
         elapsed = time.time() - self.start
         eta = ""
         if self.first_round_wall is not None and 0 < self.fraction() < 1:
@@ -367,25 +433,67 @@ def summarize(run_dir: str) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--defaults", action="store_true", help="accept every default without asking")
+    parser.add_argument("--preset", help="run a saved preset (configs/presets/<name>.yaml)")
     args = parser.parse_args()
     asker = Asker(args.defaults)
+    base = [sys.executable, os.path.join(ROOT, "run.py")]
 
     print("COMPASS-FL experiment launcher (Enter keeps the value in brackets)")
-    overrides, description, rounds, budget = ask_everything(asker)
-    name = "%s_%s_%s" % (overrides["protocol.selector"], overrides["data.dataset"], time.strftime("%Y%m%d-%H%M%S"))
-    run_dir = os.path.join(ROOT, "runs", "interactive", name)
-    command = [sys.executable, os.path.join(ROOT, "run.py"), "--config", os.path.join(ROOT, "configs", "default.yaml")]
-    command += ["%s=%s" % (key, value) for key, value in overrides.items()]
+    preset = args.preset
+    presets = list_presets()
+    if preset is None and presets and not args.defaults:
+        options = [("new", "answer the questions for a new experiment")] + \
+                  [(name, text or "saved preset") for name, text in presets]
+        choice = asker.choice("0. Start from", options, "new")
+        preset = None if choice == "new" else choice
 
-    check = subprocess.run(command + ["--print-config"], cwd=ROOT, capture_output=True, text=True)
-    if check.returncode != 0:
-        sys.exit("\nInvalid configuration:\n" + check.stderr[-2000:])
+    if preset is not None:
+        path = preset if preset.endswith(".yaml") else os.path.join(PRESETS, preset + ".yaml")
+        if not os.path.exists(path):
+            sys.exit("No preset %s" % path)
+        config = resolved(base + ["--config", path])
+        print("\nPreset %s: %s on %s, N=%s, n=%s" % (os.path.basename(path), config["protocol"]["selector"],
+                                                    config["data"]["dataset"], config["network"]["N"],
+                                                    config["protocol"]["n"]))
+        overrides = {}
+        rounds = asker.value("rounds (0 = simulated-time budget)", config["run"]["rounds"], int,
+                             lambda v: None if v >= 0 else "must be >= 0")
+        if rounds != config["run"]["rounds"]:
+            overrides["run.rounds"] = rounds
+        if rounds == 0 and not config["run"]["max_sim_time"]:
+            overrides["run.max_sim_time"] = asker.value("simulated-time budget in hours", 50.0, float, positive) * 3600
+        seed = asker.value("seed", config["seed"], int)
+        if seed != config["seed"]:
+            overrides["seed"] = seed
+        ask_device(asker, overrides, "cuda" if cuda_available() else "cpu")
+        command = base + ["--config", path] + ["%s=%s" % (k, v) for k, v in overrides.items()]
+        description = "preset %s" % os.path.basename(path)[:-5]
+    else:
+        overrides, description, _, _ = ask_everything(asker)
+        command = base + ["--config", os.path.join(ROOT, "configs", "default.yaml")]
+        command += ["%s=%s" % (key, value) for key, value in overrides.items()]
+
+    config = resolved(command)
+    rounds, budget = config["run"]["rounds"], float(config["run"]["max_sim_time"] or 0)
+    selector, dataset = config["protocol"]["selector"], config["data"]["dataset"]
+    if preset is None and not args.defaults and asker.yes("save these settings as a preset", False):
+        default_name = "%s_%s_n%s" % (selector, dataset, config["protocol"]["n"])
+        name = asker.value("preset name", default_name, str,
+                           lambda v: None if re.fullmatch(r"[\w.-]+", v) else "letters, digits, _ . - only")
+        print("  saved %s" % os.path.relpath(save_preset(name, overrides, description), ROOT))
+
+    run_dir = os.path.join(ROOT, "runs", "interactive", "%s_%s_%s" % (selector, dataset, time.strftime("%Y%m%d-%H%M%S")))
     print("\nRun: %s, %s" % (description, ("%d rounds" % rounds) if rounds else "%.0f simulated hours" % (budget / 3600)))
+    if config["data"]["bypass_training"]:
+        print("  training is skipped: no accuracy will be computed")
+    elif not config["run"]["accuracy_interval"]:
+        print("  run.accuracy_interval = 0: no accuracy will be computed")
     print("Command (to reproduce):\n  " + " ".join(shlex.quote(c) for c in command + ["--run-dir", run_dir]))
     if not asker.yes("start", True):
         return
     os.makedirs(os.path.dirname(run_dir), exist_ok=True)
     progress = Progress(rounds, budget, sys.stdout.isatty())
+    progress.accuracy_off = bool(config["data"]["bypass_training"] or not config["run"]["accuracy_interval"])
     code = run(command + ["--run-dir", run_dir], run_dir, progress)
     progress.status = "finished" if code == 0 else "failed (exit %d)" % code
     progress.draw()

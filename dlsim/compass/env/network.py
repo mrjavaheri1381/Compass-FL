@@ -129,7 +129,15 @@ class FairNetwork:
         self.next_id += 1
         self.flows[flow.flow_id] = flow
         self._reallocate()
-        return await future
+        try:
+            return await future
+        except asyncio.CancelledError:
+            # The sender gave up (e.g. a handover timeout): the rest of the message is not sent
+            if flow.flow_id in self.flows:
+                self._advance()
+                self._finish(flow, ok=False)
+                self._reallocate()
+            raise
 
     # ------------------------------------------------------------------ internals
 

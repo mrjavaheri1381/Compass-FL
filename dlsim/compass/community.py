@@ -121,6 +121,7 @@ class CompassNode:
         self.pending_late: Dict[int, List[StateRecord]] = {}
         self.backups: Dict[Tuple[int, int], List[bytes]] = {}
         self.buffered: Dict[int, Dict[bytes, Tuple]] = {}
+        self.aborted: set = set()                        # (round, attempt) aborted before its handover arrived
 
     # ================================================================== utilities
 
@@ -141,17 +142,20 @@ class CompassNode:
         return self.world.send(self, dst, Message(type, self.pk, round, payload, int(size), category))
 
     async def request(self, dst: bytes, type: str, round: int, payload: Dict, size: int, category: str,
-                      timeout: float):
+                      timeout: float, cancel_on_timeout: bool = False):
         """
-        Send a request and wait for the reply carrying the same request id; None on timeout or failure.
+        Send a request and wait for the reply carrying the same request id; None on timeout or failure. With
+        ``cancel_on_timeout`` a message still in transit is abandoned on timeout (the receiver never gets it).
         """
         rid = self.world.next_rid()
         future = self.loop.create_future()
         self.waiters[rid] = future
-        self.send(dst, type, round, dict(payload, rid=rid), size, category)
+        delivery = self.send(dst, type, round, dict(payload, rid=rid), size, category)
         try:
             return await asyncio.wait_for(future, timeout)
         except asyncio.TimeoutError:
+            if cancel_on_timeout and delivery is not None and not delivery.done():
+                delivery.cancel()
             return None
         finally:
             self.waiters.pop(rid, None)
@@ -335,7 +339,11 @@ class CompassNode:
 
     def on_abort(self, msg, timing):
         state = self.rounds.get(msg.round)
-        if state is not None and state.attempt == msg.payload["attempt"] and not state.closed.done():
+        if state is None or state.attempt != msg.payload["attempt"]:
+            # The handover may still be in transit: ignore it if it arrives later
+            self.aborted.add((msg.round, msg.payload["attempt"]))
+            return
+        if not state.closed.done():
             state.aborted = True
             if state.timer is not None:
                 state.timer.cancel()
@@ -360,6 +368,9 @@ class CompassNode:
 
     def on_handover(self, msg, timing):
         payload = msg.payload
+        if (msg.round, payload["attempt"]) in self.aborted:
+            self.event("handover_ignored_aborted", msg.round, attempt=payload["attempt"])
+            return
         if self.world.crash_now(self, msg.round, "handover"):
             return
         self.reply(msg, "handover_ack", {}, SMALL, "control")
@@ -386,10 +397,10 @@ class CompassNode:
         params = ClosingParams(E=cfg.train.epochs, c=cfg.train.cycles_per_sample, Z=self.world.Z, z=cfg.closing.z,
                                delta_dl=cfg.closing.delta_dl, grace=cfg.closing.grace, rho=cfg.closing.rho,
                                contention_aware=cfg.closing.contention_aware,
-                               B_down_aggregator=self.world.nominal_download(self.index),
+                               B_down_aggregator=self.world.current_download(self.index),
                                n_target=cfg.protocol.n, ack_factor=cfg.closing.ack_factor,
                                ack_margin=cfg.closing.ack_margin,
-                               B_up_aggregator=self.world.nominal_upload(self.index),
+                               B_up_aggregator=self.world.current_upload(self.index),
                                down_up_ratio=cfg.env.devices.down_up_ratio)
         policy = make_policy(cfg.closing.policy, infos, self.now(), params)
         state = RoundState(round, attempt, list(clients), policy, theta_prev, predecessor, self.now(),
@@ -635,12 +646,18 @@ class CompassNode:
                 self.world.spawn(self.run_round(next_round, attempt, theta, proposal.clients, self.view, None,
                                                 payload["late_updates"], backups))
                 return True
-            acked = await self.request(proposal.aggregator, "handover", next_round, payload,
-                                       len(theta) + len(view_bytes) + SMALL, "handover", cfg.handover_timeout)
+            size = len(theta) + len(view_bytes) + SMALL
+            # The sender knows its own current upload capacity; the handover may also be slowed by the receiver
+            timeout = cfg.handover_timeout + cfg.handover_timeout_factor * size / self.world.current_upload(self.index)
+            acked = await self.request(proposal.aggregator, "handover", next_round, payload, size, "handover",
+                                       timeout, cancel_on_timeout=True)
             if not self.online:
                 return False
             if not acked:
-                self.event("handover_no_ack", next_round, to=self.short(proposal.aggregator), rank=index)
+                self.event("handover_no_ack", next_round, to=self.short(proposal.aggregator), rank=index,
+                           timeout=timeout)
+                # If the handover did arrive (only the acknowledgement is late), the round must not run twice
+                self.send(proposal.aggregator, "abort", next_round, {"attempt": attempt}, SMALL, "control")
                 continue
             self.world.selection_done(self, next_round, outcome, proposal, index)
             self.retained[next_round] = Retained(next_round, self.view, proposal.aggregator, attempt)

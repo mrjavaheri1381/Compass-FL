@@ -208,6 +208,15 @@ class World:
             down = 1e15
         self.network.set_capacity(index, up, down)
 
+    def current_upload(self, index: int) -> float:
+        """
+        A node's own upload capacity in its current round (each node can measure its own link).
+        """
+        return self.network.up[index]
+
+    def current_download(self, index: int) -> float:
+        return self.network.down[index]
+
     def nominal_upload(self, index: int) -> float:
         return self.devices.devices[index].B_up
 
@@ -423,7 +432,12 @@ class World:
         self.last_aggregator = node.index
 
     def round_closed(self, node: CompassNode, state, theta: bytes) -> None:
-        record = self.round_records.get(state.round, {})
+        record = self.round_records.get(state.round)
+        if record is None or record.get("aggregator") != node.index or record.get("attempt") != state.attempt:
+            # A second attempt of this round closed (another one was started or already logged). This should not
+            # happen; it is reported and not counted, and the logged attempt's record is left untouched.
+            self.log_event("duplicate_round_closed", state.round, node=node.index, attempt=state.attempt)
+            return
         policy = state.policy
         now = self.now()
         record.update({"close_time": now, "duration": now - state.dispatch, "accepted": len(policy.accepted()),

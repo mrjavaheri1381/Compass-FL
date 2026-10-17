@@ -332,7 +332,8 @@ class FaultConfig:
     max_resamples: int = 2
     max_missed: int = 3
     client_backups: bool = False
-    handover_timeout: float = 30.0    # A(t+1) must acknowledge the handover within this time
+    handover_timeout: float = 30.0    # A(t+1) must acknowledge the handover within this time, plus
+    handover_timeout_factor: float = 3.0  # this factor x the predicted transfer time (size / own current upload)
     watchdog_timeout: float = 0.0     # A(t+1) must report round completion; 0 = delta_dl + grace + 300
     retry_delay: float = 30.0         # Delay before retrying a selection that found nobody
 

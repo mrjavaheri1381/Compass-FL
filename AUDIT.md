@@ -630,3 +630,19 @@ Noted, not changed:
 - A solve takes no simulated time (candidates solve in parallel in reality; about 0.05 s against rounds of ~60 s).
 - The flow-level network loops over all nodes on every event; correct, but a likely hot spot at N = 1000.
 
+### 7.9 Handover with large models (2026-10-17, found on FEMNIST)
+
+With the FEMNIST model (6.8 MB) a handover from a slow or slowed-down aggregator took longer than the fixed 30 s
+acknowledgement timeout. The sender moved on to the next proposal while the earlier transfers kept going, so up to
+19 candidates received the model and each ran the same round: clients were interrupted again and again and the run
+crashed with `KeyError: 'client_detail'` when a second copy of a round closed. Fixed:
+- the handover timeout is `fault.handover_timeout + fault.handover_timeout_factor (3) x size / own current upload`;
+- on a timeout the sender abandons the transfer (the network releases the link) and sends an abort; a candidate
+  ignores a handover whose attempt was aborted;
+- the acknowledgement deadline and the contention model use the aggregator's current upload / download capacity
+  (known locally) instead of the nominal one; with a sudden slowdown the nominal value made every client a straggler
+  (round 9 of the failing run: 0/14 aggregated);
+- a duplicate round close is logged (`duplicate_round_closed`) instead of crashing.
+The failing 100-round FEMNIST run now completes (12.6/14 updates aggregated per round on average, no handover
+failures). The 60-round CIFAR reference runs change slightly (seed 1: stragglers 8.7% -> 7.3%; seed 2 identical).
+

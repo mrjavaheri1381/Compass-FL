@@ -1,0 +1,33 @@
+# description: compass on femnist (N=355, n=14, M=60, k_nb=40, w_data=0.5, w_c=0.8, E=7)
+# Saved by run_interactive.py on 2026-10-17 12:34. Run with:
+#   python run_interactive.py --preset compass_femnist_n14     or     python run.py --config configs/presets/compass_femnist_n14.yaml
+base: ../default.yaml
+protocol:
+  selector: compass
+  n: 14
+  M: 60
+  k_nb: 40
+data:
+  dataset: femnist
+  partition: natural
+network:
+  N: 355
+solver:
+  name: greedy_swap
+utility:
+  weights:
+    comp: 0.1
+    comm: 0.1
+    data: 0.5
+    fair: 0.1
+    adh: 0.2
+  w_c: 0.8
+  w_r: 0.2
+closing:
+  policy: predictive
+run:
+  rounds: 100
+  accuracy_interval: 5
+train:
+  epochs: 7
+seed: 32

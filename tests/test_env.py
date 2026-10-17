@@ -170,3 +170,23 @@ def test_dataset_size_cap_in_priors():
     uncapped = devices.priors(E=1, D=D, Z=1.0, declared=False)
     capped = devices.priors(E=1, D=D, Z=1.0, declared=False, D_max=100)
     assert capped[0].sigma == pytest.approx(uncapped[0].sigma / 10, rel=1e-3)
+
+
+def test_cancelled_transfer_releases_the_link():
+    """A sender that gives up (handover timeout) stops sending: the other flow gets the whole uplink."""
+    net = FairNetwork(3, small_message_bytes=0)
+    net.set_capacity(0, up=100.0, down=100.0)
+    net.set_capacity(1, up=1000.0, down=1000.0)
+    net.set_capacity(2, up=1000.0, down=1000.0)
+
+    async def scenario():
+        abandoned = asyncio.ensure_future(net.transfer(0, 1, 10_000, delay=0.0))
+        kept = asyncio.ensure_future(net.transfer(0, 2, 1_000, delay=0.0))
+        await asyncio.sleep(2.0)      # both at 50 B/s: 100 B of the kept flow sent
+        abandoned.cancel()
+        timing = await kept
+        return timing, net.flows
+
+    timing, flows = run(scenario)
+    # After the cancel the kept flow sends its remaining 900 B at 100 B/s: done at 2 + 9 = 11 s
+    assert timing.ok and timing.t_last == pytest.approx(11.0) and not flows
