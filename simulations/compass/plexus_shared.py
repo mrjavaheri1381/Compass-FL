@@ -273,7 +273,11 @@ class PlexusWorld:
                 self.test_loader = self.data.test_loader()
             record["accuracy"], record["test_loss"] = evaluate_model(model, self.test_loader)
         self.log.write("rounds", {k: v for k, v in record.items() if k != "logged"})
-        print("Round %d closed at t=%.2f by node %d (plexus)" % (round, record["close_time"], record["aggregator"]))
+        # Same format as the COMPASS-FL world (parsed by run_interactive.py)
+        print("Round %d closed at t=%.2f by node %d (%d/%d aggregated%s)" % (
+            round, record["close_time"], record["aggregator"], len(record.get("contributors") or []),
+            len(record.get("clients") or []),
+            ", acc=%.4f" % record["accuracy"] if record.get("accuracy") is not None else ""), flush=True)
         logged = len([r for r in self.completed.values() if r.get("logged")])
         max_time = self.config.run.max_sim_time
         if (self.config.run.rounds and logged >= self.config.run.rounds) or (max_time and self.now() >= max_time):
