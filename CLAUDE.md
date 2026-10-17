@@ -7,6 +7,8 @@ in English.
 
 ## Where things are
 
+- `SERVER.md`: **on the GPU server, read this first**: environment, datasets (CIFAR-10, FEMNIST), which sweeps to run,
+  and known errors with their fixes.
 - `AUDIT.md`: the audit against the paper, **every design decision taken with the author** (Q1–Q14, RQ1–RQ6, P2-7),
   the Phase-2 status (section 7), and the findings for the paper (7.1). Read it before changing protocol behavior.
 - `README.md`, section "COMPASS-FL": how to run, the architecture, how to add a solver or selector, and the mapping
